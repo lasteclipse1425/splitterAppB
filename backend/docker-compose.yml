@@ -1,0 +1,28 @@
+services:
+  splitter-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: splitter-backend
+    restart: unless-stopped
+    # НАША ДОБАВКА 1: Прописываем стабильный DNS, чтобы ускорить скачивание
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      PORT: 8080
+      NODE_ENV: production
+      DATABASE_URL: file:/app/data/splitter.db
+      JWT_SECRET: student_dev_jwt_secret_change_me
+      ALLOW_ALL_CORS: 1
+      JSON_BODY_LIMIT: 4mb
+      # НАША ДОБАВКА 2: Открываем бэкенд для внешней сети (вашего телефона)
+      HOST: 0.0.0.0
+    volumes:
+      - sqlite_data:/app/data
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    command: sh -c "mkdir -p /app/data && npx prisma migrate deploy && node dist/server.js"
+
+volumes:
+  sqlite_data:
