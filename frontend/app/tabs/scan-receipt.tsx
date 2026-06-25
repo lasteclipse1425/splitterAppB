@@ -14,6 +14,8 @@ import {
 } from '@/features/receipt/model/receipt-session.store';
 import { useAppStore } from '@/shared/lib/stores/app-store';
 import { DEFAULT_LANGUAGE } from '@/shared/config/languages';
+import { CurrencySegmentedControl } from '@/shared/ui/CurrencySegmentedControl';
+import type { CurrencyCode } from '@/shared/lib/money';
 
 const getDefaultSessionName = () => {
   const now = new Date();
@@ -46,11 +48,14 @@ export default function ScanReceiptScreen() {
   const storedCapture = useReceiptSessionStore((s) => s.capture);
   const setSessionNameStore = useReceiptSessionStore((s) => s.setSessionName);
   const storedSessionName = useReceiptSessionStore((s) => s.session?.sessionName);
+  const setStoreCurrency = useReceiptSessionStore((s) => s.setCurrency);
   const appLanguage = useAppStore((s) => s.language);
+  const defaultCurrency = useAppStore((s) => s.defaultCurrency);
 
   const [sessionName, setSessionName] = useState(() => storedSessionName || getDefaultSessionName());
   const [isAutoName, setIsAutoName] = useState(() => !storedSessionName);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<CurrencyCode>(defaultCurrency);
 
   const language = appLanguage || DEFAULT_LANGUAGE;
 
@@ -152,6 +157,7 @@ export default function ScanReceiptScreen() {
 
       setSessionNameStore(preparedName);
       setCapture(capture);
+      setStoreCurrency(currency);
 
       await parseReceipt({
         sessionName: preparedName,
@@ -167,7 +173,7 @@ export default function ScanReceiptScreen() {
       const message = error instanceof Error ? error.message : 'Something went wrong while sending the receipt';
       setLocalError(message);
     }
-  }, [cameraRef, parsing, sessionName, setSessionNameStore, setCapture, parseReceipt, language, router]);
+  }, [cameraRef, parsing, sessionName, setSessionNameStore, setCapture, setStoreCurrency, currency, parseReceipt, language, router]);
 
   const useMock = useCallback(() => {
     router.push({
@@ -230,9 +236,9 @@ export default function ScanReceiptScreen() {
             </View>
             <YStack ai="center" mt="$6" bg="rgba(0,0,0,0.6)" px="$4" py="$2" borderRadius="$6">
               <Animated.View style={animatedTextStyle}>
-                <Paragraph fow="700" fos="$6" col="#2ECC71">Читаем чек...</Paragraph>
+                <Paragraph fow="700" fos="$6" col="#2ECC71">?????? ???...</Paragraph>
               </Animated.View>
-              <Paragraph mt="$2" col="white" fos="$3" ta="center">Искусственный интеллект распознаёт позиции и цены.</Paragraph>
+              <Paragraph mt="$2" col="white" fos="$3" ta="center">????????????? ????????? ?????????? ??????? ? ????.</Paragraph>
             </YStack>
           </View>
         )}
@@ -255,6 +261,17 @@ export default function ScanReceiptScreen() {
               color="white"
               borderWidth={1}
               borderColor="rgba(255,255,255,0.25)"
+            />
+          </YStack>
+
+          <YStack gap={8}>
+            <Paragraph color="$gray1" fontSize={12}>
+              Currency
+            </Paragraph>
+            <CurrencySegmentedControl
+              tone="dark"
+              value={currency}
+              onChange={(code) => setCurrency(code)}
             />
           </YStack>
 

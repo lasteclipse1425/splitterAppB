@@ -1,13 +1,12 @@
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { Scan } from '@tamagui/lucide-icons';
+import { Scan, Users } from '@tamagui/lucide-icons';
 import {
   YStack,
   Paragraph,
   Card,
   XStack,
-  Spinner,
   Separator,
   View,
   Button,
@@ -17,6 +16,10 @@ import { useGroupsStore } from '@/features/groups/model/groups.store';
 import type { GroupMember } from '@/features/groups/api/groups.api';
 import UserAvatar from '@/shared/ui/UserAvatar';
 import Fab from '@/shared/ui/Fab';
+import { appRadii } from '@/shared/ui/app-tokens';
+import { useAppTheme } from '@/shared/ui/theme-context';
+import { SkeletonCard } from '@/shared/ui/Skeleton';
+import { EmptyState } from '@/shared/ui/EmptyState';
 
 function AvatarStack({
   members,
@@ -83,6 +86,7 @@ export default function GroupsListScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { groups, counts, loading, error, fetchGroups } = useGroupsStore();
+  const { colors, appShadow } = useAppTheme();
 
   useEffect(() => {
     fetchGroups();
@@ -110,20 +114,22 @@ export default function GroupsListScreen() {
         return (
           <Card
             key={group.id}
-            pressStyle={{ scale: 0.98 }}
+            pressStyle={{ scale: 0.99, opacity: 0.96 }}
             onPress={() =>
               router.push({
                 pathname: '/tabs/groups/[groupId]',
                 params: { groupId: String(group.id) },
               } as never)
             }
-            h={62}
-            br={12}
+            h={66}
+            br={appRadii.lg}
             bw={1}
-            bc="$gray5"
+            bc={colors.border}
+            bg={colors.card}
             px="$4"
             ai="center"
             jc="center"
+            {...appShadow.card}
           >
             <XStack w="100%" jc="space-between" ai="center">
               <YStack>
@@ -144,15 +150,17 @@ export default function GroupsListScreen() {
 
   if (loading && hasNoGroups) {
     return (
-      <YStack f={1} ai="center" jc="center">
-        <Spinner />
+      <YStack f={1} p="$4" gap="$3" bg={colors.background}>
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
       </YStack>
     );
   }
 
   return (
-    <YStack f={1} p="$4" gap="$3" bg="$background">
-      <Paragraph fow="700" fos="$7">
+    <YStack f={1} p="$4" gap="$3" bg={colors.background}>
+      <Paragraph fow="700" fos="$7" color={colors.text}>
         {t('groups.title', 'Groups')}
       </Paragraph>
       <Separator />
@@ -174,7 +182,11 @@ export default function GroupsListScreen() {
       {error && <Paragraph col="$red10">{error}</Paragraph>}
 
       {hasNoGroups ? (
-        <Paragraph col="$gray10">{t('groups.empty', 'No groups yet. Tap + to create.')}</Paragraph>
+        <EmptyState
+          icon={Users}
+          title={t('groups.empty', 'No groups yet')}
+          subtitle={t('groups.emptySubtitle', 'Tap + to create your first group')}
+        />
       ) : (
         <YStack gap="$3">{cards}</YStack>
       )}

@@ -5,6 +5,7 @@ import { XStack, YStack, Paragraph, Button, Text } from 'tamagui';
 import { Trash2 } from '@tamagui/lucide-icons';
 import { useFriendsStore } from '../model/friends.store';
 import UserAvatar from '@/shared/ui/UserAvatar';
+import { useAppColors } from '@/shared/ui/theme-context';
 
 function pickTitle(f: any) {
   return (
@@ -44,6 +45,7 @@ function pickAvatar(f: any): string | null {
 export const FriendListItem = memo(function FriendListItem({ friend }: { friend: any }) {
   const { remove } = useFriendsStore();
   const { t } = useTranslation();
+  const colors = useAppColors();
 
   const title = pickTitle(friend);
   const subtitle = pickSubtitle(friend);
@@ -70,18 +72,18 @@ export const FriendListItem = memo(function FriendListItem({ friend }: { friend:
   };
 
   return (
-    <XStack h={60} ai="center" jc="space-between" px="$4" bg="$background">
+    <XStack h={60} ai="center" jc="space-between" px="$4" bg={colors.card}>
       <XStack ai="center" gap="$3">
         <UserAvatar
           uri={avatarUrl ?? undefined}
           label={avatarLabel}
           size={36}
           textSize={14}
-          backgroundColor="$gray5"
+          backgroundColor={colors.primarySoft}
         />
         <YStack>
-          <Text fontSize={17} fontWeight="600">{title}</Text>
-          {!!subtitle && <Paragraph fontSize={14} color="$gray10">{subtitle}</Paragraph>}
+          <Text fontSize={16} fontWeight="600" color={colors.text}>{title}</Text>
+          {!!subtitle && <Paragraph fontSize={13} color={colors.textMuted}>{subtitle}</Paragraph>}
         </YStack>
       </XStack>
 

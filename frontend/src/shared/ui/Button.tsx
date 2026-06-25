@@ -1,7 +1,7 @@
-// почти полностью переписал данный файл из-за багов, ошибок и устаревших элементов кода
-
 import { forwardRef, type ComponentProps, type ComponentRef } from 'react';
 import { Button as TamaguiButton, Text } from 'tamagui';
+import { useAppTheme } from '@/shared/ui/theme-context';
+import { appRadii } from '@/shared/ui/app-tokens';
 
 type Variant = 'primary' | 'secondary' | 'outline';
 type Size = 'small' | 'medium' | 'large';
@@ -22,32 +22,35 @@ const sizeStyles: Record<Size, { height: '$3' | '$4' | '$5'; paddingHorizontal: 
   large: { height: '$5', paddingHorizontal: '$8' },
 };
 
-const variantStyles: Record<Variant, { backgroundColor: string; color: string; borderWidth?: number; borderColor?: string }> = {
-  primary: {
-    backgroundColor: '#2ECC71',
-    color: '#FFFFFF',
-  },
-  secondary: {
-    backgroundColor: '$gray4',
-    color: '$gray12',
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '$green10',
-    color: '$green10',
-  },
-};
-
 export const Button = forwardRef<TamaguiButtonRef, CustomButtonProps>(
   ({ title, variant = 'primary', size = 'medium', disabled = false, ...rest }, ref) => {
+    const { colors, greenOutline, appShadow } = useAppTheme();
+
+    const variantStyles: Record<Variant, { backgroundColor: string; color: string; borderWidth?: number; borderColor?: string }> = {
+      primary: {
+        backgroundColor: colors.primary,
+        color: '#FFFFFF',
+      },
+      secondary: {
+        backgroundColor: colors.card,
+        color: colors.text,
+      },
+      outline: {
+        backgroundColor: 'transparent',
+        borderWidth: greenOutline.borderWidth,
+        borderColor: colors.primaryBorder,
+        color: colors.primaryBorder,
+      },
+    };
+
     const tone = variantStyles[variant];
 
     const styles = {
-      borderRadius: '$4' as const,
-      pressStyle: { scale: 0.97 },
+      borderRadius: appRadii.md,
+      pressStyle: { scale: 0.985, opacity: 0.94 },
       ...sizeStyles[size],
       ...tone,
+      ...(variant === 'primary' && !disabled ? appShadow.soft : null),
       ...(disabled
         ? {
             backgroundColor: variant === 'outline' ? 'transparent' : '$gray8',

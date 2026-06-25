@@ -8,6 +8,7 @@ interface UserAvatarProps {
   size?: number;
   textSize?: number;
   backgroundColor?: string;
+  labelColor?: string;
 }
 
 const styles = StyleSheet.create({
@@ -23,6 +24,7 @@ export function UserAvatar({
   size = 48,
   textSize,
   backgroundColor = '$gray5',
+  labelColor,
 }: UserAvatarProps) {
   const radius = size / 2;
 
@@ -39,7 +41,11 @@ export function UserAvatar({
       {uri ? (
         <Image source={{ uri }} style={styles.image} resizeMode="cover" />
       ) : (
-        <Text fontSize={textSize ?? Math.round(size / 2.5)} fontWeight="700">
+        <Text
+          fontSize={textSize ?? Math.round(size / 2.5)}
+          fontWeight="700"
+          color={labelColor}
+        >
           {label}
         </Text>
       )}

@@ -43,7 +43,9 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "continue": "Continue",
-    "back": "Back"
+    "back": "Back",
+    "on": "On",
+    "off": "Off"
   },
   "friends": {
     "title": "Friends",
@@ -100,11 +102,17 @@
       "friends": "Friends",
       "groups": "Groups"
     },
+    "quickHabits": {
+      "title": "Quick split from habits",
+      "subtitle": "{{count}} saved habits ready",
+      "empty": "Create habits after your next split"
+    },
     "recent": {
       "title": "Recent bills",
       "showMore": "Show more",
       "loading": "Loading recent bills...",
       "empty": "No bills yet",
+      "emptySubtitle": "Scan a receipt to split your first bill",
       "summary": "{{date}} • {{participants}}",
       "fallbackName": "Bill",
       "participants": "{{count}} participants",
@@ -134,7 +142,8 @@
       "upload": "Upload from phone",
       "uploading": "Uploading...",
       "reset": "Reset avatar",
-      "resetting": "Resetting..."
+      "resetting": "Resetting...",
+      "viewHint": "Tap the photo to view full size"
     },
     "info": {
       "title": "User information",
@@ -212,16 +221,51 @@
     "history": "Recent bills",
     "historyDetails": "Bill details"
   },
+  "groups": {
+    "debts": {
+      "title": "Balances",
+      "subtitle": "Who owes whom across group bills",
+      "loading": "Loading balances...",
+      "empty": "All settled up",
+      "emptySubtitle": "No outstanding balances in this group",
+      "youOwe": "You owe {{name}}",
+      "owesYou": "{{name}} owes you",
+      "owes": "{{from}} owes {{to}}",
+      "remind": "Remind",
+      "mvpNote": "Based on sessions where the bill creator paid"
+    }
+  },
   "history": {
     "title": "Recent bills",
     "subtitle": "Home",
     "loading": "Loading...",
     "empty": "No history yet",
+    "emptySubtitle": "Finished splits will appear here",
     "participants": "{{count}} participants",
     "participants_one": "{{count}} participant",
     "fallbackName": "Bill"
   },
+  "finish": {
+    "share": "Share"
+  },
   "settings": {
+    "theme": {
+      "title": "Appearance",
+      "description": "Choose how the app looks on your device.",
+      "options": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      }
+    },
+    "colorblind": {
+      "title": "Colorblind-friendly",
+      "description": "Uses blue and amber instead of green and red."
+    },
+    "currency": {
+      "title": "Default currency",
+      "description": "Used for new receipts when the currency is unclear."
+    },
     "language": {
       "title": "Language",
       "description": "Choose the language used across the app.",
@@ -231,5 +275,63 @@
         "uz": "Uzbek"
       }
     }
+  },
+  "quickHabits": {
+    "title": "Quick Habits",
+    "smartSplit": "Smart Split by Habits",
+    "quickActions": "Quick Actions",
+    "foundMatches": "Matched {{count}} of {{total}} items",
+    "noMatchesHint": "Split all items or manage habit rules",
+    "noMatches": "No habit matches for current items",
+    "applyAll": "Apply all",
+    "applySelected": "Apply selected ({{count}})",
+    "review": "Review",
+    "splitAllEqually": "Split all equally",
+    "manageRules": "Manage rules",
+    "suggestions": "Suggestions",
+    "create": "Create",
+    "rules": "Rules",
+    "selectItems": "Select items to apply",
+    "savedRule": "Saved rule",
+    "fromHistory": "From {{name}} ({{date}})",
+    "itemPlaceholder": "Dish name (e.g. Pizza)...",
+    "equalSplit": "Equal split",
+    "byUnits": "By units",
+    "whoPays": "Who pays",
+    "createRule": "Create rule",
+    "activeHabits": "Active habits ({{count}})",
+    "noCustomRules": "No custom rules yet",
+    "noSessionHint": "Start a bill to pick participants. You can still save item names.",
+    "applied": "Habits applied",
+    "undo": "Undo",
+    "saveToHabits": "Save splits to Quick Habits",
+    "savedToHabits": "Splits saved to Quick Habits",
+    "habitsTab": "Quick Habits",
+    "selectHabits": "Select habits to start a split",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "startSplit": "Start split",
+    "startSplitCount": "Start split ({{count}})",
+    "pickParticipants": "Pick participants",
+    "pickParticipantsHint": "Choose who will be in this split",
+    "searchPeople": "Search friends...",
+    "continueSplit": "Continue",
+    "setPrices": "Set prices",
+    "setPricesHint": "Some habits do not have a saved price yet",
+    "pricePlaceholder": "Unit price",
+    "qtyPlaceholder": "Qty",
+    "editRule": "Edit rule",
+    "saveChanges": "Save changes",
+    "createAnother": "Create another",
+    "draftList": "Created in this session",
+    "saveAsTemplate": "Save as Quick Habit",
+    "saveAsTemplateHint": "Save this split as a reusable habit template",
+    "templateNamePlaceholder": "e.g. Office lunch",
+    "templatePreview": "{{participants}} people · {{items}} items · {{total}}",
+    "templateSaved": "Habit saved",
+    "saveTemplate": "Save habit",
+    "defaultTemplateName": "My split",
+    "noTemplates": "No saved habits yet",
+    "noTemplatesHint": "After scanning and splitting a bill, save it as a Quick Habit"
   }
 }

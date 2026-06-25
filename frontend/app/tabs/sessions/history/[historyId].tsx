@@ -4,6 +4,9 @@ import { YStack, XStack, Text, ScrollView, Button } from 'tamagui';
 
 import UserAvatar from '@/shared/ui/UserAvatar';
 import { useSessionsHistoryStore } from '@/features/sessions/model/history.store';
+import { formatMoney } from '@/shared/lib/money';
+import { appRadii } from '@/shared/ui/app-tokens';
+import { useAppTheme } from '@/shared/ui/theme-context';
 import type {
   SessionHistoryEntry,
   SessionHistoryAllocation,
@@ -13,7 +16,7 @@ import type {
 } from '@/features/sessions/api/history.api';
 
 const DEFAULT_CURRENCY = 'UZS';
-const fmtCurrency = (value: number, currency: string) => `${currency} ${value.toLocaleString()}`;
+const fmtCurrency = (value: number, currency: string) => formatMoney(value, currency);
 const BULLET = '\u2022';
 const DETAIL_LIMIT = 50;
 
@@ -87,6 +90,7 @@ const buildParticipantsView = (bill?: SessionHistoryEntry): ParticipantView[] =>
 export default function HistoryDetailsScreen() {
   const { historyId } = useLocalSearchParams<{ historyId: string }>();
   const router = useRouter();
+  const { colors, appShadow } = useAppTheme();
   const sessions = useSessionsHistoryStore(state => state.sessions);
   const loading = useSessionsHistoryStore(state => state.loading);
   const initialized = useSessionsHistoryStore(state => state.initialized);
@@ -118,18 +122,18 @@ export default function HistoryDetailsScreen() {
 
   if (!bill && loading) {
     return (
-      <YStack f={1} bg="$background" ai="center" jc="center">
-        <Text fontSize={16}>Yuklanmoqda...</Text>
+      <YStack f={1} bg={colors.background} ai="center" jc="center">
+        <Text fontSize={16} color={colors.text}>Yuklanmoqda...</Text>
       </YStack>
     );
   }
 
   if (!bill) {
     return (
-      <YStack f={1} bg="$background" ai="center" jc="center" gap="$3">
-        <Text fontSize={16} fontWeight="600">History not found</Text>
+      <YStack f={1} bg={colors.background} ai="center" jc="center" gap="$3">
+        <Text fontSize={16} fontWeight="600" color={colors.text}>History not found</Text>
         {error && (
-          <Text fontSize={14} color="$red10">
+          <Text fontSize={14} color={colors.danger}>
             {error}
           </Text>
         )}
@@ -139,20 +143,22 @@ export default function HistoryDetailsScreen() {
   }
 
   return (
-    <YStack f={1} bg="$background" px="$4" pt="$4" pb="$4">
+    <YStack f={1} bg={colors.background} px="$4" pt="$4" pb="$4">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ alignItems: 'center', paddingBottom: 32, gap: 16 }}
       >
         <YStack w={358} gap="$3">
-          <Text fontSize={24} fontWeight="700">{bill.sessionName || 'Hisob'}</Text>
+          <Text fontSize={24} fontWeight="700" color={colors.text}>
+            {bill.sessionName || 'Hisob'}
+          </Text>
           <Button unstyled alignSelf="flex-start" onPress={() => router.back()}>
-            <Text color="#2ECC71">{'< Ortga'}</Text>
+            <Text color={colors.primary}>{'< Ortga'}</Text>
           </Button>
-          <Text fontSize={14} color="$gray10">
+          <Text fontSize={14} color={colors.textMuted}>
             {`${formatSessionDate(bill.finalizedAt || bill.createdAt)} ${BULLET} ${(bill.participants ?? []).length} ishtirokchi`}
           </Text>
-          <Text fontSize={16} fontWeight="700" color="#2ECC71">
+          <Text fontSize={16} fontWeight="700" color={colors.primary}>
             {fmtCurrency(bill.grandTotal ?? 0, currency)}
           </Text>
         </YStack>
@@ -162,25 +168,29 @@ export default function HistoryDetailsScreen() {
             key={participant.uniqueId}
             w={358}
             borderWidth={1}
-            borderColor="#2ECC71"
-            br={12}
-            bg="white"
+            borderColor={colors.primaryBorder}
+            br={appRadii.lg}
+            bg={colors.card}
             px={16}
             py={12}
             gap="$3"
+            {...appShadow.card}
           >
             <XStack jc="space-between" ai="center">
-              <XStack ai="center" gap="$2">
+              <XStack ai="center" gap="$2" f={1} pr="$2">
                 <UserAvatar
                   uri={avatarUrl ?? undefined}
                   label={(participant.username || 'U').slice(0, 1).toUpperCase()}
                   size={40}
                   textSize={16}
-                  backgroundColor="$gray5"
+                  backgroundColor={colors.borderSoft}
+                  labelColor={colors.text}
                 />
-                <Text fontSize={16} fontWeight="600">{participant.username}</Text>
+                <Text fontSize={16} fontWeight="600" color={colors.text} numberOfLines={1}>
+                  {participant.username}
+                </Text>
               </XStack>
-              <Text fontSize={16} fontWeight="700" color="#2ECC71">
+              <Text fontSize={16} fontWeight="700" color={colors.primary}>
                 {fmtCurrency(amount, currency)}
               </Text>
             </XStack>
@@ -188,15 +198,17 @@ export default function HistoryDetailsScreen() {
             <YStack gap={8}>
               {items.length ? (
                 items.map(item => (
-                  <XStack key={item.id} jc="space-between" ai="center">
-                    <Text fontSize={14}>{item.title}</Text>
-                    <Text fontSize={14} fontWeight="600" color="#2ECC71">
-                      {item.price.toLocaleString()}
+                  <XStack key={item.id} jc="space-between" ai="center" gap="$2">
+                    <Text fontSize={14} color={colors.text} f={1}>
+                      {item.title}
+                    </Text>
+                    <Text fontSize={14} fontWeight="600" color={colors.primary}>
+                      {fmtCurrency(item.price, currency)}
                     </Text>
                   </XStack>
                 ))
               ) : (
-                <Text fontSize={12} color="$gray9">
+                <Text fontSize={12} color={colors.textMuted}>
                   Hech qanday element biriktirilmagan
                 </Text>
               )}

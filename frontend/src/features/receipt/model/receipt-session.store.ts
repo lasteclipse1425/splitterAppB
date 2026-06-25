@@ -12,6 +12,7 @@ import type {
   ReceiptAllocation,
 } from '@/features/receipt/api/receipt.api';
 import { ReceiptApi } from '@/features/receipt/api/receipt.api';
+import { normalizeToSupported, type CurrencyCode } from '@/shared/lib/money';
 
 export type CapturedReceiptImage = {
   uri?: string;
@@ -129,6 +130,19 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
     set({ parsing: true, parseError: undefined });
     try {
       const response = await ReceiptApi.parse(payload);
+      if (__DEV__) {
+        const meta = (response as { source?: string; _parseMeta?: unknown }).source;
+        const parseMeta = (response as { _parseMeta?: unknown })._parseMeta;
+        console.log('[ReceiptParse] response:', {
+          source: meta ?? 'unknown',
+          items: response.items?.length ?? 0,
+          currency: response.summary?.currency,
+          _parseMeta: parseMeta,
+        });
+        if (meta === 'mock') {
+          console.warn('[ReceiptParse] MOCK items — Gemini did not parse the photo. Check backend terminal logs.');
+        }
+      }
       const splitItems: ReceiptSplitItem[] = response.items.map((item) => ({
         id: item.id,
         name: item.name,
@@ -142,8 +156,13 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
         perPersonCount: {},
       }));
 
-      // ✅ Извлекаем валюту из ответа API
-      const detectedCurrency = response.summary?.currency || 'UZS';
+      // ✅ Нормализуем валюту к поддерживаемой (UZS/USD/JPY),
+      // с фолбэком на выбранную пользователем (уже лежит в сторе).
+      const fallbackCurrency = (get().currency as CurrencyCode) || 'UZS';
+      const detectedCurrency = normalizeToSupported(
+        response.summary?.currency,
+        fallbackCurrency
+      );
 
       set({
         parsing: false,
@@ -174,6 +193,17 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
     if (!session) throw new Error('No session to finalize');
     if (participants.length === 0) throw new Error('Add at least one participant');
 
+    let sessionId = session.sessionId;
+    if (sessionId < 0) {
+      const created = await ReceiptApi.createSession();
+      sessionId = created.id;
+      set((state) =>
+        state.session
+          ? { session: { ...state.session, sessionId } }
+          : {}
+      );
+    }
+
     const payloadItems: FinalizeReceiptItemPayload[] = items.map((item) => ({
       id: item.id,
       name: item.name,
@@ -188,7 +218,7 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
     set({ finalizing: true, finalizeError: undefined });
     try {
       const response = await ReceiptApi.finalize({
-        sessionId: session.sessionId,
+        sessionId,
         sessionName: session.sessionName,
         participants,
         items: payloadItems,

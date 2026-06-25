@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from 'react-native';
-import { YStack, XStack, Text, Button, Circle, ScrollView, Spinner, Input } from 'tamagui';
+import { YStack, XStack, Text, Button, Circle, ScrollView, Spinner } from 'tamagui';
 import { Users as UsersIcon, Check, Plus, Minus, Package as PackageIcon } from '@tamagui/lucide-icons';
 
 import { useAppStore } from '@/shared/lib/stores/app-store';
@@ -12,7 +13,19 @@ import type { FinishPayload, ReceiptSplitItem } from '@/features/receipt/model/r
 import { ReceiptApi } from '@/features/receipt/api/receipt.api';
 import type { FinalizeReceiptItemPayload, FinalizeTotalsByItem, FinalizeTotalsByParticipant, ReceiptAllocation } from '@/features/receipt/api/receipt.api';
 import { useSessionsHistoryStore } from '@/features/sessions/model/history.store';
-import { useQuickHabitsStore } from '@/features/receipt/model/quick-habits.store';
+import { applyHabitMatchesToItems } from '@/features/receipt/lib/apply-habit-matches';
+import type { HabitMatch } from '@/features/receipt/lib/quick-habits.types';
+import { useQuickHabitSuggestions } from '@/features/receipt/hooks/useQuickHabitSuggestions';
+import { useQuickHabitsUiStore } from '@/features/receipt/model/quick-habits-ui.store';
+import { QuickHabitsBanner } from '@/features/receipt/ui/QuickHabitsBanner';
+import { openSaveHabitTemplate } from '@/features/receipt/model/quick-habits-ui.store';
+import { FadeInView } from '@/shared/ui/FadeInView';
+import { appRadii } from '@/shared/ui/app-tokens';
+import { useAppTheme } from '@/shared/ui/theme-context';
+import { useEntryAnimation } from '@/shared/lib/hooks/useEntryAnimation';
+import { tapLight } from '@/shared/lib/haptics';
+import { formatMoney, getMoneyParts, type CurrencyCode } from '@/shared/lib/money';
+import { CurrencySegmentedControl } from '@/shared/ui/CurrencySegmentedControl';
 
 // ===== Types =====
 type Participant = { uniqueId: string; username: string };
@@ -235,17 +248,10 @@ const parseParticipantsParam = (raw?: string): Participant[] => {
   }
 };
 
-const formatDateSimple = (value?: string) => {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('en-US', {
-    day: '2-digit',
-    month: 'short',
-  });
-};
-
 export default function ItemsSplitScreen() {
+  const { t } = useTranslation();
+  const entryAnim = useEntryAnimation();
+  const { colors, greenOutline, greenSurface, appShadow } = useAppTheme();
   const { participants: participantsParam, receiptId } = useLocalSearchParams<{
     participants?: string;
     receiptId?: string;
@@ -262,7 +268,6 @@ export default function ItemsSplitScreen() {
 
   const fetchHistory = useSessionsHistoryStore((s) => s.fetchHistory);
   const historyInitialized = useSessionsHistoryStore((s) => s.initialized);
-  const historySessions = useSessionsHistoryStore((s) => s.sessions);
 
   useEffect(() => {
     if (!historyInitialized) {
@@ -270,29 +275,22 @@ export default function ItemsSplitScreen() {
     }
   }, [historyInitialized, fetchHistory]);
 
-  const loadCustomHabits = useQuickHabitsStore((s) => s.loadHabits);
-  const customHabits = useQuickHabitsStore((s) => s.habits);
-  const habitsInitialized = useQuickHabitsStore((s) => s.initialized);
-  const addCustomHabit = useQuickHabitsStore((s) => s.addHabit);
-
-  useEffect(() => {
-    if (!habitsInitialized) {
-      loadCustomHabits().catch(() => {});
-    }
-  }, [habitsInitialized, loadCustomHabits]);
+  const registerApplyHandler = useQuickHabitsUiStore((s) => s.registerApplyHandler);
+  const unregisterApplyHandler = useQuickHabitsUiStore((s) => s.unregisterApplyHandler);
+  const setUndoSnapshot = useQuickHabitsUiStore((s) => s.setUndoSnapshot);
+  const showHabitsToast = useQuickHabitsUiStore((s) => s.showToast);
 
   const storeCurrency = useReceiptSessionStore((s) => s.currency);
+  const setStoreCurrency = useReceiptSessionStore((s) => s.setCurrency);
 
   const fmtCurrency = useCallback((n: number) => {
-    const currency = storeCurrency || 'UZS';
-    return `${currency} ${Math.round(n).toLocaleString('en-US')}`;
+    return formatMoney(n, storeCurrency);
   }, [storeCurrency]);
 
   const getCurrencyParts = useCallback((n: number) => {
-    const formatted = fmtCurrency(n);
-    const [currency, ...rest] = formatted.split(' ');
-    return { currency, amount: rest.join(' ') || '0' };
-  }, [fmtCurrency]);
+    const parts = getMoneyParts(n, storeCurrency);
+    return { currency: parts.symbol, amount: parts.amount };
+  }, [storeCurrency]);
 
   const [items, setLocalItems] = useState<Item[]>([]);
 
@@ -308,53 +306,6 @@ export default function ItemsSplitScreen() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // --- custom habit modal state ---
-  const [showAddHabitModal, setShowAddHabitModal] = useState(false);
-  const [habitItemName, setHabitItemName] = useState('');
-  const [habitSplitMode, setHabitSplitMode] = useState<'equal' | 'count'>('equal');
-  const [habitAssignedTo, setHabitAssignedTo] = useState<string[]>([]);
-  const [habitPerPersonCount, setHabitPerPersonCount] = useState<Record<string, number>>({});
-
-  const toggleHabitUser = (uid: string) => {
-    setHabitAssignedTo((prev) =>
-      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
-    );
-  };
-
-  const incHabitUser = (uid: string) => {
-    setHabitPerPersonCount((prev) => ({
-      ...prev,
-      [uid]: (prev[uid] || 0) + 1,
-    }));
-  };
-
-  const decHabitUser = (uid: string) => {
-    setHabitPerPersonCount((prev) => {
-      const next = { ...prev };
-      const val = (next[uid] || 0) - 1;
-      if (val <= 0) delete next[uid];
-      else next[uid] = val;
-      return next;
-    });
-  };
-
-  const saveCustomHabitAction = async () => {
-    if (!habitItemName.trim()) return;
-
-    await addCustomHabit({
-      itemName: habitItemName.trim(),
-      splitMode: habitSplitMode,
-      assignedTo: habitSplitMode === 'equal' ? habitAssignedTo : [],
-      perPersonCount: habitSplitMode === 'count' ? habitPerPersonCount : {},
-    });
-
-    // Clear and close form settings (but keep modal open so they can see it added to the list)
-    setHabitItemName('');
-    setHabitSplitMode('equal');
-    setHabitAssignedTo([]);
-    setHabitPerPersonCount({});
-  };
 
   const participantsFromParams = useMemo(
     () => parseParticipantsParam(participantsParam),
@@ -419,6 +370,12 @@ export default function ItemsSplitScreen() {
     }, [resetState])
   );
 
+  useEffect(() => {
+    if (Array.isArray(storeItems) && storeItems.length > 0) {
+      setLocalItems(toLocalItems(storeItems));
+    }
+  }, [storeItems]);
+
   const commitItems = useCallback(
     (updater: (prev: Item[]) => Item[]) => {
       let nextForStore: Item[] | null = null;
@@ -439,167 +396,41 @@ export default function ItemsSplitScreen() {
     [setStoreItems]
   );
 
-  const habitMatches = useMemo(() => {
-    const matches: Record<
-      string,
-      {
-        splitMode: 'equal' | 'count';
-        assignedTo: string[];
-        perPersonCount: Record<string, number>;
-        source: 'custom' | 'history';
-        sessionName?: string;
-        date?: string;
-      }
-    > = {};
+  const { matches, matchIds, matchCount } = useQuickHabitSuggestions(items, participants);
 
-    const currentUids = new Set(participants.map((p) => p.uniqueId));
+  const itemNames = useMemo(
+    () => Object.fromEntries(items.map((item) => [item.id, item.name])),
+    [items]
+  );
 
-    for (const item of items) {
-      // 1. Try matching in custom (manually saved) habits first
-      const customMatch = customHabits.find(
-        (h) => h.itemName.toLowerCase().trim() === item.name.toLowerCase().trim()
+  const handleApplyHabits = useCallback(
+    (selectedMatches: Record<string, HabitMatch>, selectedIds: string[]) => {
+      if (selectedIds.length === 0) return;
+      void tapLight();
+      setUndoSnapshot(toStoreItems(items));
+      commitItems((prev) =>
+        applyHabitMatchesToItems(prev, selectedMatches, participants, selectedIds)
       );
+      showHabitsToast();
+    },
+    [items, participants, commitItems, setUndoSnapshot, showHabitsToast]
+  );
 
-      if (customMatch) {
-        if (customMatch.splitMode === 'count') {
-          const perPersonCount: Record<string, number> = {};
-          for (const [uid, qty] of Object.entries(customMatch.perPersonCount)) {
-            if (currentUids.has(uid) && qty > 0) {
-              perPersonCount[uid] = qty;
-            }
-          }
-          if (Object.keys(perPersonCount).length > 0) {
-            matches[item.id] = {
-              splitMode: 'count',
-              assignedTo: [],
-              perPersonCount,
-              source: 'custom',
-            };
-            continue; // matched, skip history check
-          }
-        } else {
-          const assigned = (customMatch.assignedTo || []).filter((uid) => currentUids.has(uid));
-          if (assigned.length > 0) {
-            matches[item.id] = {
-              splitMode: 'equal',
-              assignedTo: assigned,
-              perPersonCount: {},
-              source: 'custom',
-            };
-            continue; // matched, skip history check
-          }
-        }
+  const handleApplyAllHabits = useCallback(
+    (ids: string[]) => {
+      const selectedMatches: Record<string, HabitMatch> = {};
+      for (const id of ids) {
+        if (matches[id]) selectedMatches[id] = matches[id];
       }
+      handleApplyHabits(selectedMatches, ids);
+    },
+    [matches, handleApplyHabits]
+  );
 
-      // 2. Try matching in past history sessions (fallback)
-      if (historySessions && historySessions.length > 0) {
-        for (const session of historySessions) {
-          const payload = session.payload;
-          if (!payload || !payload.totals || !payload.totals.byItem) continue;
-
-          const pastItem = payload.totals.byItem.find(
-            (pi) => pi.name.toLowerCase().trim() === item.name.toLowerCase().trim()
-          );
-
-          if (pastItem) {
-            const itemAllocs = (payload.allocations || []).filter(
-              (a) => a.itemId === pastItem.itemId
-            );
-
-            if (itemAllocs.length > 0) {
-              const pastUids = itemAllocs.map((a) => a.participantId);
-              const presentPastUids = pastUids.filter((uid) => currentUids.has(uid));
-
-              if (presentPastUids.length > 0) {
-                const isCount = itemAllocs.some(
-                  (a) => typeof (a as any).shareUnits === 'number' && (a as any).shareUnits > 0
-                );
-
-                if (isCount) {
-                  const perPersonCount: Record<string, number> = {};
-                  for (const a of itemAllocs) {
-                    if (currentUids.has(a.participantId)) {
-                      const u = (a as any).shareUnits || 0;
-                      if (u > 0) {
-                        perPersonCount[a.participantId] = u;
-                      }
-                    }
-                  }
-
-                  if (Object.keys(perPersonCount).length > 0) {
-                    matches[item.id] = {
-                      splitMode: 'count',
-                      assignedTo: [],
-                      perPersonCount,
-                      source: 'history',
-                      sessionName: session.sessionName || 'Bill',
-                      date: formatDateSimple(session.finalizedAt || session.createdAt),
-                    };
-                    break;
-                  }
-                } else {
-                  matches[item.id] = {
-                    splitMode: 'equal',
-                    assignedTo: presentPastUids,
-                    perPersonCount: {},
-                    source: 'history',
-                    sessionName: session.sessionName || 'Bill',
-                    date: formatDateSimple(session.finalizedAt || session.createdAt),
-                  };
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    return matches;
-  }, [items, participants, customHabits, historySessions]);
-
-  const applyHabitSplits = () => {
-    if (Object.keys(habitMatches).length === 0) return;
-
-    commitItems((prev) =>
-      prev.map((item) => {
-        const match = habitMatches[item.id];
-        if (!match) return item;
-
-        if (match.splitMode === 'count') {
-          const perPersonCount: Record<string, number> = {};
-          let allocated = 0;
-          for (const [uid, qty] of Object.entries(match.perPersonCount)) {
-            const toAssign = Math.min(qty, item.quantity - allocated);
-            if (toAssign > 0) {
-              perPersonCount[uid] = toAssign;
-              allocated += toAssign;
-            }
-          }
-          if (allocated === 0) {
-            return {
-              ...item,
-              splitMode: 'equal',
-              assignedTo: participants.map((p) => p.uniqueId),
-              perPersonCount: {},
-            };
-          }
-          return {
-            ...item,
-            splitMode: 'count',
-            assignedTo: [],
-            perPersonCount,
-          };
-        } else {
-          return {
-            ...item,
-            splitMode: 'equal',
-            assignedTo: [...match.assignedTo],
-            perPersonCount: {},
-          };
-        }
-      })
-    );
-  };
+  useEffect(() => {
+    registerApplyHandler(handleApplyHabits);
+    return () => unregisterApplyHandler();
+  }, [handleApplyHabits, registerApplyHandler, unregisterApplyHandler]);
 
   const splitAllEqually = () => {
     commitItems((prev) =>
@@ -776,6 +607,8 @@ export default function ItemsSplitScreen() {
       ? editing.assignedTo.filter((x) => x !== uid)
       : [...editing.assignedTo, uid];
 
+    if (!has) void tapLight();
+
     setEditing({
       ...editing,
       splitMode: 'equal',
@@ -879,12 +712,23 @@ export default function ItemsSplitScreen() {
   return payload;
 });
 
-      const effectiveSessionId =
+      let effectiveSessionId =
       session?.sessionId ??
       (sessionReceiptId && !isMockSession ? parseInt(sessionReceiptId, 10) : undefined);
 
     if (!effectiveSessionId) {
       throw new Error('Session ID is required');
+    }
+
+    if (effectiveSessionId < 0) {
+      const created = await ReceiptApi.createSession();
+      const newSessionId = created.id;
+      effectiveSessionId = newSessionId;
+      useReceiptSessionStore.setState((state) =>
+        state.session
+          ? { session: { ...state.session, sessionId: newSessionId } }
+          : {}
+      );
     }
 
       const fallbackFinalization = buildLocalFinalization(items, participants);
@@ -1031,17 +875,26 @@ export default function ItemsSplitScreen() {
   const gapBottom = (insets?.bottom ?? 0) + 72;
 
   return (
-    <YStack f={1} bg="$background" position="relative">
+    <YStack f={1} bg={colors.background} position="relative">
       {/* Header */}
-      <YStack bg="$background" p="$4" pb="$2">
-        <XStack w="100%" ai="center" jc="flex-start" mb="$3">
-          <YStack ai="flex-start">
-            <Text fontSize={16} fontWeight="700">
+      <YStack bg={colors.background} p="$4" pb="$2">
+        <XStack w="100%" ai="center" jc="space-between" mb="$3" gap="$3">
+          <YStack ai="flex-start" flexShrink={1}>
+            <Text fontSize={16} fontWeight="700" color={colors.text}>
               Orders
             </Text>
-            <Text fontSize={12} color="$gray10">
+            <Text fontSize={12} color={colors.textMuted}>
               {sessionReceiptId ?? (isMockSession ? 'mock-001' : 'N/A')}
             </Text>
+          </YStack>
+          <YStack width={176}>
+            <CurrencySegmentedControl
+              value={(storeCurrency as CurrencyCode) || 'UZS'}
+              onChange={(code) => {
+                if (code !== storeCurrency) void tapLight();
+                setStoreCurrency(code);
+              }}
+            />
           </YStack>
         </XStack>
       </YStack>
@@ -1054,11 +907,12 @@ export default function ItemsSplitScreen() {
       >
         <YStack px="$4" gap="$3">
           {/* Participants */}
+          <FadeInView index={0} enabled={entryAnim}>
           <YStack>
             <XStack w="100%" ai="center" jc="flex-start" mb="$2">
               <XStack ai="center" gap="$2">
-                <UsersIcon size={18} color="$gray10" />
-                <Text fontWeight="700">Participants ({participants.length})</Text>
+                <UsersIcon size={18} color={colors.textMuted} />
+                <Text fontWeight="700" color={colors.text}>Participants ({participants.length})</Text>
               </XStack>
             </XStack>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1068,12 +922,14 @@ export default function ItemsSplitScreen() {
                     key={p.uniqueId}
                     ai="center"
                     gap="$2"
-                    px="$2"
-                    py="$1"
+                    px="$2.5"
+                    py="$1.5"
                     borderWidth={1}
-                    borderColor="$gray6"
-                    borderRadius={16}
+                    borderColor={colors.border}
+                    borderRadius={appRadii.lg}
                     minWidth={100}
+                    bg={colors.card}
+                    {...appShadow.soft}
                   >
                     <Avatar name={p.username} />
                     <Text numberOfLines={1} fontSize={13}>
@@ -1084,114 +940,20 @@ export default function ItemsSplitScreen() {
               </XStack>
             </ScrollView>
           </YStack>
+          </FadeInView>
 
-          {/* Quick Split Widget */}
-          <YStack
-            borderWidth={1}
-            borderColor={Object.keys(habitMatches).length > 0 ? '#2ECC71' : '$gray6'}
-            borderRadius={12}
-            bg={Object.keys(habitMatches).length > 0 ? '#2ECC710D' : '$color1'}
-            p="$3.5"
-            gap="$3.5"
-            mt="$1"
-          >
-            <XStack ai="center" jc="space-between">
-              <YStack gap="$1" f={1} pr="$2">
-                <Text fontSize={15} fontWeight="700" color="#2C3D4F">
-                  ⚡ {Object.keys(habitMatches).length > 0 ? 'Smart Split by Habits' : 'Quick Actions'}
-                </Text>
-                <Text fontSize={12} color="$gray10">
-                  {Object.keys(habitMatches).length > 0
-                    ? `Matched ${Object.keys(habitMatches).length} of ${items.length} items from habits/history!`
-                    : 'Split all items or add custom split rule'}
-                </Text>
-              </YStack>
-
-              {Object.keys(habitMatches).length > 0 && (
-                <Button
-                  unstyled
-                  bg="#2ECC71"
-                  hoverStyle={{ bg: '#27AE60' }}
-                  onPress={applyHabitSplits}
-                  px={16}
-                  py={8}
-                  borderRadius={8}
-                  ai="center"
-                  jc="center"
-                  pressStyle={{ opacity: 0.9 }}
-                >
-                  <Text fontSize={13} fontWeight="700" color="white">
-                    Apply Habits
-                  </Text>
-                </Button>
-              )}
-            </XStack>
-
-            <XStack gap="$2" flexWrap="wrap" ai="center">
-              {Object.keys(habitMatches).length === 0 && (
-                <Button
-                  unstyled
-                  bg="#2ECC71"
-                  hoverStyle={{ bg: '#27AE60' }}
-                  onPress={splitAllEqually}
-                  px={14}
-                  py={8}
-                  borderRadius={8}
-                  ai="center"
-                  jc="center"
-                  pressStyle={{ opacity: 0.9 }}
-                >
-                  <Text fontSize={13} fontWeight="700" color="white">
-                    Split All Equally
-                  </Text>
-                </Button>
-              )}
-
-              {Object.keys(habitMatches).length > 0 && (
-                <Button
-                  unstyled
-                  borderWidth={1}
-                  borderColor="#2ECC71"
-                  bg="transparent"
-                  onPress={splitAllEqually}
-                  px={12}
-                  py={6}
-                  borderRadius={8}
-                  ai="center"
-                  jc="center"
-                  pressStyle={{ opacity: 0.9 }}
-                >
-                  <Text fontSize={12} fontWeight="600" color="#2ECC71">
-                    Split All Equally
-                  </Text>
-                </Button>
-              )}
-
-              <Button
-                unstyled
-                borderWidth={1}
-                borderColor="$gray7"
-                bg="transparent"
-                onPress={() => setShowAddHabitModal(true)}
-                px={12}
-                py={Object.keys(habitMatches).length > 0 ? 6 : 8}
-                borderRadius={8}
-                ai="center"
-                jc="center"
-                pressStyle={{ opacity: 0.9 }}
-              >
-                <Text fontSize={Object.keys(habitMatches).length > 0 ? 12 : 13} fontWeight="600" color="$gray11">
-                  ➕ Add Habit Rule
-                </Text>
-              </Button>
-
-              {Object.keys(habitMatches).length > 0 && (
-                <Text fontSize={11} color="$gray10" f={1} mt="$1">
-                  💡 Matched items will split based on past choices.
-                </Text>
-              )}
-            </XStack>
-          </YStack>
+          <FadeInView index={1} enabled={entryAnim}>
+          <QuickHabitsBanner
+            matchCount={matchCount}
+            totalItems={items.length}
+            matches={matches}
+            matchIds={matchIds}
+            participants={participants}
+            itemNames={itemNames}
+            onApplyAll={handleApplyAllHabits}
+            onSplitAllEqually={splitAllEqually}
+          />
+          </FadeInView>
 
           {/* Items */}
           <YStack gap="$3" mt="$2">
@@ -1234,18 +996,19 @@ export default function ItemsSplitScreen() {
                 <YStack
                   key={it.id}
                   w="100%"
-                  borderWidth={1}
+                  borderWidth={assigned || isCountAndMissing ? greenSurface.borderWidth : 1}
                   borderColor={
-                    isCountAndMissing ? '#E74C3C' : assigned ? '#2ECC71' : '#E4E7EB'
+                    isCountAndMissing ? colors.danger : assigned ? colors.primaryBorder : colors.border
                   }
-                  borderRadius={12}
-                  bg="$color1"
+                  borderRadius={appRadii.lg}
+                  bg={colors.card}
+                  {...appShadow.soft}
                 >
                   <XStack w="100%" ai="center" jc="space-between" px={16} py="$3" gap="$3">
                     <YStack f={1} pr={12} gap="$1">
                       <XStack ai="center" gap="$2">
                         <Circle size={8} bg={confidenceColor} />
-                        <Text fontSize={16} fontWeight="700" numberOfLines={1}>
+                        <Text fontSize={16} fontWeight="700" color={colors.text} numberOfLines={1}>
                           {it.name}
                           {it.quantity > 1 ? ` (${it.quantity}x)` : ''}
                         </Text>
@@ -1270,7 +1033,7 @@ export default function ItemsSplitScreen() {
                         <Text fontSize={12} color="$gray10">
                           {priceParts.currency}
                         </Text>
-                        <Text fontSize={16} fontWeight="700" color="#2ECC71">
+                        <Text fontSize={16} fontWeight="700" color={colors.primary}>
                           {priceParts.amount}
                         </Text>
                       </XStack>
@@ -1283,16 +1046,16 @@ export default function ItemsSplitScreen() {
                         px={assigned ? 16 : 12}
                         py={assigned ? 6 : undefined}
                         borderRadius={assigned ? 5 : 6}
-                        bg={assigned ? '#2ECC711A' : '$backgroundPress'}
+                        bg={assigned ? colors.primarySoft : colors.borderSoft}
                         borderWidth={assigned ? 0 : 1}
-                        borderColor={assigned ? 'transparent' : '#E4E7EB'}
+                        borderColor={assigned ? 'transparent' : colors.border}
                         ai="center"
                         jc="center"
                       >
                         <Text
                           fontSize={14}
                           fontWeight="600"
-                          color={assigned ? '#2ECC71' : '$gray11'}
+                          color={assigned ? colors.primary : colors.textMuted}
                         >
                           {assigned ? 'Change' : 'Who?'}
                         </Text>
@@ -1315,7 +1078,14 @@ export default function ItemsSplitScreen() {
         px="$4"
       >
         {!canContinue ? (
-          <YStack p="$3" borderWidth={1} borderColor="$gray5" borderRadius={12} bg="$color1">
+          <YStack
+            p="$3.5"
+            borderWidth={1}
+            borderColor={colors.border}
+            borderRadius={appRadii.lg}
+            bg={colors.card}
+            {...appShadow.card}
+          >
             <XStack w="100%" ai="center" jc="space-between" mb="$2">
               <Text color="$gray10" fontSize={13}>
                 Assignment progress
@@ -1329,13 +1099,27 @@ export default function ItemsSplitScreen() {
             />
           </YStack>
         ) : (
-          <YStack>
+          <YStack gap="$2">
+            <Button
+              unstyled
+              onPress={openSaveHabitTemplate}
+              height={38}
+              {...greenOutline}
+              bg="transparent"
+              ai="center"
+              jc="center"
+              pressStyle={{ opacity: 0.9 }}
+            >
+              <Text fontSize={14} fontWeight="600" color={colors.primary}>
+                {t('quickHabits.saveAsTemplate', 'Save as Quick Habit')}
+              </Text>
+            </Button>
             <Button
               unstyled
               onPress={onContinue}
               height={41}
-              borderRadius={10}
-              bg="#2ECC71"
+              borderRadius={appRadii.md}
+              bg={colors.primary}
               ai="center"
               jc="center"
               pressStyle={finalizing ? undefined : { opacity: 0.9 }}
@@ -1569,263 +1353,6 @@ export default function ItemsSplitScreen() {
                 </Text>
               </Button>
             </XStack>
-          </YStack>
-        </YStack>
-      )}
-
-      {/* Manage Habits Modal */}
-      {showAddHabitModal && (
-        <YStack
-          position="absolute"
-          inset={0}
-          bg="rgba(0,0,0,0.45)"
-          ai="center"
-          pt={insets.top + 24}
-          zIndex={100}
-        >
-          <YStack
-            w={358}
-            maxWidth={358}
-            h={620}
-            bg="$color1"
-            borderRadius={12}
-            p="$3.5"
-            gap="$3.5"
-            borderWidth={1}
-            borderColor="$gray5"
-            elevation={10}
-          >
-            {/* Header */}
-            <XStack w="100%" ai="center" jc="space-between">
-              <Text fontSize={17} fontWeight="700" color="#2C3D4F">
-                ⚙️ Quick Split Habits
-              </Text>
-              <Button
-                unstyled
-                onPress={() => setShowAddHabitModal(false)}
-                p="$1.5"
-                ai="center"
-                jc="center"
-              >
-                <Text fontSize={18} fontWeight="700" color="$gray10">✕</Text>
-              </Button>
-            </XStack>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 1 }}>
-              <YStack gap="$4" pb="$4">
-                {/* Form Section */}
-                <YStack gap="$2.5" p="$3" borderWidth={1} borderColor="$gray5" borderRadius={8} bg="$backgroundPress">
-                  <Text fontSize={13} fontWeight="700" color="#2C3D4F">
-                    Create new split rule
-                  </Text>
-                  
-                  <Input
-                    placeholder="Dish Name (e.g. Pizza Margherita)..."
-                    value={habitItemName}
-                    onChangeText={setHabitItemName}
-                    h={38}
-                    px={12}
-                    bg="$color1"
-                    borderWidth={1}
-                    borderColor="$gray6"
-                    borderRadius={8}
-                    fontSize={13}
-                  />
-
-                  {/* Mode select */}
-                  <XStack gap="$2" mt="$1">
-                    <Button
-                      unstyled
-                      px={10}
-                      py={6}
-                      borderRadius={6}
-                      bg={habitSplitMode === 'equal' ? '#2ECC71' : '$color1'}
-                      borderWidth={1}
-                      borderColor={habitSplitMode === 'equal' ? '#2ECC71' : '#E4E7EB'}
-                      onPress={() => setHabitSplitMode('equal')}
-                    >
-                      <Text fontSize={12} fontWeight="600" color={habitSplitMode === 'equal' ? 'white' : '$gray11'}>
-                        Equal split
-                      </Text>
-                    </Button>
-                    <Button
-                      unstyled
-                      px={10}
-                      py={6}
-                      borderRadius={6}
-                      bg={habitSplitMode === 'count' ? '#2ECC71' : '$color1'}
-                      borderWidth={1}
-                      borderColor={habitSplitMode === 'count' ? '#2ECC71' : '#E4E7EB'}
-                      onPress={() => setHabitSplitMode('count')}
-                    >
-                      <Text fontSize={12} fontWeight="600" color={habitSplitMode === 'count' ? 'white' : '$gray11'}>
-                        By units
-                      </Text>
-                    </Button>
-                  </XStack>
-
-                  {/* Participants pick */}
-                  <Text fontSize={12} fontWeight="600" color="$gray10" mt="$1">
-                    Who pays:
-                  </Text>
-
-                  <YStack gap="$1.5">
-                    {participants.map((p) => {
-                      const isCountRow = habitSplitMode === 'count';
-                      const assignedQty = habitPerPersonCount[p.uniqueId] || 0;
-                      const isSelected = isCountRow ? assignedQty > 0 : habitAssignedTo.includes(p.uniqueId);
-
-                      return (
-                        <Pressable
-                          key={`h-p-${p.uniqueId}`}
-                          onPress={() => {
-                            if (isCountRow) {
-                              if (assignedQty > 0) {
-                                decHabitUser(p.uniqueId);
-                              } else {
-                                incHabitUser(p.uniqueId);
-                              }
-                            } else {
-                              toggleHabitUser(p.uniqueId);
-                            }
-                          }}
-                        >
-                          <XStack
-                            h={40}
-                            ai="center"
-                            jc="space-between"
-                            px="$3"
-                            borderWidth={1}
-                            borderColor={isSelected ? '#2ECC71' : '#E4E7EB'}
-                            borderRadius={8}
-                            bg="$color1"
-                          >
-                            <Text fontSize={13} fontWeight="600">{p.username}</Text>
-
-                            <XStack ai="center" gap="$2">
-                              {isCountRow && (
-                                <XStack ai="center" gap="$1.5">
-                                  <Button
-                                    unstyled
-                                    onPress={(e: any) => {
-                                      e.stopPropagation();
-                                      decHabitUser(p.uniqueId);
-                                    }}
-                                    w={22}
-                                    h={22}
-                                    br={99}
-                                    bg="#E4E7EB"
-                                    ai="center"
-                                    jc="center"
-                                  >
-                                    <Text fontSize={12} color="#2C3D4F">-</Text>
-                                  </Button>
-                                  <Text fontSize={12} minWidth={10} textAlign="center">
-                                    {assignedQty}
-                                  </Text>
-                                  <Button
-                                    unstyled
-                                    onPress={(e: any) => {
-                                      e.stopPropagation();
-                                      incHabitUser(p.uniqueId);
-                                    }}
-                                    w={22}
-                                    h={22}
-                                    br={99}
-                                    bg="#E4E7EB"
-                                    ai="center"
-                                    jc="center"
-                                  >
-                                    <Text fontSize={12} color="#2C3D4F">+</Text>
-                                  </Button>
-                                </XStack>
-                              )}
-                              <Circle
-                                size={14}
-                                borderColor="#2ECC71"
-                                borderWidth={1.5}
-                                bg={isSelected ? '#2ECC71' : 'transparent'}
-                              />
-                            </XStack>
-                          </XStack>
-                        </Pressable>
-                      );
-                    })}
-                  </YStack>
-
-                  <Button
-                    unstyled
-                    onPress={saveCustomHabitAction}
-                    h={34}
-                    borderRadius={8}
-                    bg="#2ECC71"
-                    ai="center"
-                    jc="center"
-                    mt="$2"
-                    disabled={!habitItemName.trim()}
-                    opacity={habitItemName.trim() ? 1 : 0.6}
-                    pressStyle={{ opacity: 0.9 }}
-                  >
-                    <Text color="white" fontWeight="700" fontSize={13}>
-                      Create Rule
-                    </Text>
-                  </Button>
-                </YStack>
-
-                {/* List of active habits */}
-                <YStack gap="$2" mt="$2">
-                  <Text fontSize={14} fontWeight="700" color="#2C3D4F">
-                    Active Habits ({customHabits.length})
-                  </Text>
-
-                  {customHabits.length === 0 ? (
-                    <Text fontSize={12} color="$gray10" fontStyle="italic" p="$1">
-                      No custom rules added yet. Matches will rely on history.
-                    </Text>
-                  ) : (
-                    customHabits.map((habit) => (
-                      <XStack
-                        key={habit.id}
-                        p="$2.5"
-                        borderWidth={1}
-                        borderColor="$gray5"
-                        borderRadius={8}
-                        bg="$color1"
-                        jc="space-between"
-                        ai="center"
-                      >
-                        <YStack gap="$0.5" f={1} pr="$2">
-                          <Text fontWeight="700" fontSize={13}>{habit.itemName}</Text>
-                          <Text fontSize={11} color="$gray10">
-                            {habit.splitMode === 'equal'
-                              ? `Split equally: ${habit.assignedTo
-                                  .map((uid) => participants.find((p) => p.uniqueId === uid)?.username || uid)
-                                  .join(', ')}`
-                              : `Split units: ${Object.entries(habit.perPersonCount)
-                                  .map(([uid, val]) => `${participants.find((p) => p.uniqueId === uid)?.username || uid} (${val}x)`)
-                                  .join(', ')}`}
-                          </Text>
-                        </YStack>
-                        <Button
-                          unstyled
-                          onPress={() => useQuickHabitsStore.getState().removeHabit(habit.id)}
-                          px={8}
-                          py={4}
-                          br={6}
-                          bg="#E74C3C1A"
-                          hoverStyle={{ bg: '#E74C3C2D' }}
-                          pressStyle={{ opacity: 0.9 }}
-                        >
-                          <Text color="#E74C3C" fontWeight="700" fontSize={11}>
-                            Delete
-                          </Text>
-                        </Button>
-                      </XStack>
-                    ))
-                  )}
-                </YStack>
-              </YStack>
-            </ScrollView>
           </YStack>
         </YStack>
       )}

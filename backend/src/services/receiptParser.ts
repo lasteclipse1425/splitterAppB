@@ -70,6 +70,34 @@ const MODEL_CANDIDATES = Array.from(
 );
 
 const DEBUG_PARSE = process.env.DEBUG_PARSE === "1";
+const VERBOSE_PARSE =
+  DEBUG_PARSE || process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
+
+function maskApiKey(key?: string): string {
+  if (!key) return "(not set)";
+  if (key.length <= 10) return "***";
+  return `${key.slice(0, 6)}…${key.slice(-4)}`;
+}
+
+function parseLog(...args: unknown[]) {
+  if (VERBOSE_PARSE) console.log("[parseReceipt]", ...args);
+}
+
+function parseWarn(...args: unknown[]) {
+  console.warn("[parseReceipt]", ...args);
+}
+
+if (process.env.NODE_ENV !== "test") {
+  // Always log once at startup (including Docker production) so key issues are obvious.
+  console.log(
+    `[parseReceipt] init: key=${maskApiKey(GEMINI_API_KEY)} primaryModel=${GEMINI_MODEL_PARSE} candidates=${MODEL_CANDIDATES.length} verbose=${VERBOSE_PARSE}`
+  );
+  if (!GEMINI_API_KEY) {
+    console.warn("[parseReceipt] GEMINI_API_KEY is missing — scans will return MOCK items until key is set");
+  } else if (!/^AIza[0-9A-Za-z_-]{10,}$/.test(GEMINI_API_KEY)) {
+    console.warn("[parseReceipt] GEMINI_API_KEY format looks unexpected (usually starts with AIza)");
+  }
+}
 let cachedModel: { model: string; version: string } | null = null;
 let lastUsedVersion: string | undefined;
 
@@ -85,6 +113,12 @@ const SYMBOL_TO_ISO: Record<string, string> = {
   "¥": "JPY",
   JPY: "JPY",
   円: "JPY",
+  YEN: "JPY",
+  UZS: "UZS",
+  "SO'M": "UZS",
+  SOM: "UZS",
+  СУМ: "UZS",
+  "СЎМ": "UZS",
   "₽": "RUB",
   RUB: "RUB",
   RUR: "RUB",
@@ -167,7 +201,8 @@ Rules:
 - totalPrice = unitPrice * quantity (round to 2 decimals).
 - Include service/tips/fees as separate items with kind set.
 - If currency symbol present ignore it when recording numbers.
-- Detect the receipt currency (e.g. symbols like $, €, ₽ or textual names) and report the ISO 4217 code in uppercase.
+- Detect the receipt currency (e.g. symbols like $, ¥, € or textual names like "so'm", "сум", "yen") and report the ISO 4217 code in uppercase.
+- This app primarily handles UZS (Uzbek so'm), USD (US dollar) and JPY (Japanese yen); prefer these when the receipt matches, but still report other valid ISO codes when clearly different.
 - When unsure about currency, return "UNKNOWN".
 - confidence: a number from 0.0 to 1.0 indicating how confident you are in reading this item correctly.
 - summary tax, tip, and subtotal should be extracted if available, otherwise omit. grandTotal = sum of item totalPrice values (after any discounts).`;
@@ -270,16 +305,22 @@ function mockParse(): ParseResult {
 export async function parseReceipt(
   options: ParseOptions
 ): Promise<ParseResult> {
+  const imageKb = Math.round((options.imageBase64.length * 3) / 4 / 1024);
+  parseLog(
+    "start:",
+    `session="${options.sessionName}"`,
+    `lang=${options.language}`,
+    `mime=${options.mimeType}`,
+    `image≈${imageKb}KB`
+  );
+
   if (!GEMINI_API_KEY) {
-    if (DEBUG_PARSE)
-      console.warn("[parseReceipt] Using mock: GEMINI_API_KEY not set");
+    parseWarn("GEMINI_API_KEY not set — returning mock items (Кола/Сервис)");
     return mockParse();
   }
 
-  if (DEBUG_PARSE && !/^AIza[0-9A-Za-z_-]{10,}$/.test(GEMINI_API_KEY)) {
-    console.warn(
-      "[parseReceipt] GEMINI_API_KEY format unexpected (should usually start with 'AIza')."
-    );
+  if (!/^AIza[0-9A-Za-z_-]{10,}$/.test(GEMINI_API_KEY)) {
+    parseWarn("GEMINI_API_KEY format unexpected — API call may fail");
   }
   const dynamicCandidates = cachedModel
     ? [
@@ -287,11 +328,12 @@ export async function parseReceipt(
         ...MODEL_CANDIDATES.filter((m) => m !== cachedModel!.model),
       ]
     : MODEL_CANDIDATES.slice();
-  if (DEBUG_PARSE) {
-    console.log(
-      `[parseReceipt] REST mode; preferred version=${GEMINI_API_VERSION}; cached=${
-        cachedModel ? cachedModel.model + "@" + cachedModel.version : "none"
-      }; candidates=${dynamicCandidates.join(",")}`
+  if (VERBOSE_PARSE) {
+    parseLog(
+      "config:",
+      `apiVersion=${GEMINI_API_VERSION}`,
+      `cached=${cachedModel ? `${cachedModel.model}@${cachedModel.version}` : "none"}`,
+      `tryOrder=${dynamicCandidates.slice(0, 5).join(",")}${dynamicCandidates.length > 5 ? ",…" : ""}`
     );
   }
   const prompt = `${EXTRACTION_INSTRUCTIONS}\nLanguage context of receipt: ${options.language}\nSession Name: ${options.sessionName}`;
@@ -307,7 +349,7 @@ export async function parseReceipt(
   for (const modelName of dynamicCandidates) {
     const start = Date.now();
     try {
-      if (DEBUG_PARSE) console.log(`[parseReceipt] Trying model: ${modelName}`);
+      parseLog(`try model: ${modelName}`);
       const text = await generateViaRest(
         modelName,
         prompt,
@@ -316,12 +358,11 @@ export async function parseReceipt(
       );
       const parsed = safeParseJson(text);
       if (!parsed.ok || !parsed.data) {
-        if (DEBUG_PARSE) {
-          console.warn(
-            `[parseReceipt] Model ${modelName} returned non-parseable JSON, length=${text.length}. Snippet=`,
-            text.slice(0, 280)
-          );
-        }
+        parseWarn(
+          `model ${modelName}: JSON parse failed`,
+          `responseChars=${text.length}`,
+          `snippet=${JSON.stringify(text.slice(0, 200))}`
+        );
         modelsTried.push({
           model: modelName,
           version: lastUsedVersion || "?",
@@ -358,21 +399,25 @@ export async function parseReceipt(
       };
       if (!cachedModel) {
         cachedModel = { model: modelName, version: lastUsedVersion || "v1" };
-        if (DEBUG_PARSE)
-          console.log(
-            `[parseReceipt] Caching model ${cachedModel.model}@${cachedModel.version}`
-          );
+        parseLog(`cached model ${cachedModel.model}@${cachedModel.version}`);
       }
+      parseLog(
+        "success:",
+        `model=${modelName}`,
+        `items=${result.items.length}`,
+        `currency=${result.summary.currency}`,
+        `grandTotal=${result.summary.grandTotal}`,
+        `ms=${durationMs}`
+      );
       return result;
     } catch (err: any) {
       lastError = err;
       const status = err?.status || err?.statusCode;
-      if (DEBUG_PARSE)
-        console.warn(
-          `[parseReceipt] Error with model ${modelName} (status=${status}) → ${
-            err?.message || err
-          }`
-        );
+      parseWarn(
+        `model ${modelName} failed:`,
+        `status=${status ?? "n/a"}`,
+        err?.apiError?.code || err?.apiError?.message || err?.message || String(err)
+      );
       modelsTried.push({
         model: modelName,
         version: lastUsedVersion || "?",
@@ -385,13 +430,16 @@ export async function parseReceipt(
       continue;
     }
   }
-  if (DEBUG_PARSE)
-    console.error(
-      "[parseReceipt] All model attempts failed, returning mock. Last error:",
-      lastError
-    );
+  parseWarn(
+    "all models failed — returning mock items",
+    `tried=${modelsTried.length}`,
+    `lastError=${lastError instanceof Error ? lastError.message : String(lastError)}`
+  );
+  if (VERBOSE_PARSE && modelsTried.length) {
+    parseLog("modelsTried:", JSON.stringify(modelsTried, null, 2));
+  }
   const fallback = mockParse();
-  if (DEBUG_PARSE) fallback.modelsTried = modelsTried;
+  fallback.modelsTried = modelsTried;
   return fallback;
 }
 
@@ -438,16 +486,12 @@ async function generateViaRest(
             }
           }
         } catch {}
-        if (DEBUG_PARSE) {
+        if (VERBOSE_PARSE) {
           const code = errorPayload?.code || resp.status;
           const msg = errorPayload?.message || resp.statusText;
-          console.warn(
-            `[generateViaRest] ${ver} ${model} -> HTTP ${resp.status} (${code}) ${msg}`
-          );
+          parseWarn(`HTTP ${resp.status} (${code}):`, msg);
           if (errorPayload?.status && errorPayload?.status !== code) {
-            console.warn(
-              `[generateViaRest] API error status field: ${errorPayload.status}`
-            );
+            parseWarn("API status field:", errorPayload.status);
           }
         }
         lastErr = Object.assign(
@@ -470,15 +514,13 @@ async function generateViaRest(
         }
       }
       const combined = texts.join("\n").trim();
-      if (DEBUG_PARSE)
-        console.log(
-          `[generateViaRest] success via ${ver} model=${model} chars=${combined.length}`
-        );
+      if (VERBOSE_PARSE) {
+        parseLog(`HTTP ok: model=${model} responseChars=${combined.length}`);
+      }
       return combined;
     } catch (e) {
       lastErr = e;
-      if (DEBUG_PARSE)
-        console.warn(`[generateViaRest] Error calling ${ver} ${model}:`, e);
+      parseWarn(`network/error calling ${ver}/${model}:`, e instanceof Error ? e.message : e);
       continue;
     }
   }

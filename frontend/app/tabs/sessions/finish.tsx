@@ -1,11 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View } from 'react-native';
 import { YStack, XStack, Text, Button, Circle, ScrollView } from 'tamagui';
-import { Check } from '@tamagui/lucide-icons';
+import { Check, Share2 } from '@tamagui/lucide-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import type { FinalizeTotalsByItem, FinalizeTotalsByParticipant, ReceiptAllocation } from '@/features/receipt/api/receipt.api';
 import { useReceiptSessionStore, type FinishPayload } from '@/features/receipt/model/receipt-session.store';
-import { useQuickHabitsStore } from '@/features/receipt/model/quick-habits.store';
+import { openSaveHabitTemplate } from '@/features/receipt/model/quick-habits-ui.store';
+import { Confetti } from '@/shared/ui/Confetti';
+import { ShareableSplitCard } from '@/shared/ui/ShareableSplitCard';
+import { shareSplitImage } from '@/shared/lib/utils/share-split';
+import { success as hapticSuccess } from '@/shared/lib/haptics';
+import { formatMoney, getMoneyParts } from '@/shared/lib/money';
+import { appRadii } from '@/shared/ui/app-tokens';
+import { useAppTheme } from '@/shared/ui/theme-context';
+import { useEntryAnimation } from '@/shared/lib/hooks/useEntryAnimation';
 
 type Participant = { uniqueId: string; username: string };
 
@@ -25,30 +36,33 @@ const pickFirstNumber = (...values: Array<number | null | undefined>) => {
   }
   return 0;
 };
-const fmtCurrency = (n: number, currency: string) => `${currency} ${Math.round(n).toLocaleString('en-US')}`;
+const fmtCurrency = (n: number, currency: string) => formatMoney(n, currency);
 
 const getCurrencyParts = (n: number, currency: string) => {
-  const formatted = fmtCurrency(n, currency);
-  const [cur, ...rest] = formatted.split(' ');
-  return { currency: cur, amount: rest.join(' ') || '0' };
+  const parts = getMoneyParts(n, currency);
+  return { currency: parts.symbol, amount: parts.amount };
 };
 
 export default function FinishScreen() {
   const { data } = useLocalSearchParams<{ data?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const lastFinishPayload = useReceiptSessionStore((s) => s.lastFinishPayload);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const shareCardRef = useRef<View>(null);
+  const entryAnim = useEntryAnimation();
+  const { colors, greenOutline, greenSurface, appShadow } = useAppTheme();
 
-  const [savedHabits, setSavedHabits] = useState(false);
+  useEffect(() => {
+    setShowConfetti(true);
+    void hapticSuccess();
+    const timer = setTimeout(() => setShowConfetti(false), 3500);
+    return () => clearTimeout(timer);
+  }, []);
 
-  const saveCurrentSessionToHabits = async () => {
-    try {
-      const items = useReceiptSessionStore.getState().items;
-      await useQuickHabitsStore.getState().saveSessionAsHabits(items);
-      setSavedHabits(true);
-    } catch (e) {
-      console.error(e);
-    }
+  const saveCurrentSessionToHabits = () => {
+    openSaveHabitTemplate();
   };
 
   const payload = useMemo<FinishPayload | null>(() => {
@@ -424,6 +438,19 @@ export default function FinishScreen() {
   const showGrandTotal = participantSummaries.length > 0 || itemSummaries.length > 0;
   const grandTotalParts = showGrandTotal ? getCurrencyParts(effectiveGrandTotal, currency) : null;
 
+  const handleShare = () => {
+    const input = {
+      sessionName,
+      currency,
+      grandTotal: effectiveGrandTotal,
+      participants: participantSummaries.map((p) => ({
+        username: p.username,
+        amount: p.amount,
+      })),
+    };
+    void shareSplitImage(shareCardRef, input);
+  };
+
   const Avatar = ({ name }: { name: string }) => (
     <Circle size={32} bg="$gray5" ai="center" jc="center">
       <Text color="white" fontWeight="700" fontSize={14}>
@@ -433,12 +460,12 @@ export default function FinishScreen() {
   );
 
   return (
-    <YStack f={1} bg="$background" position="relative">
+    <YStack f={1} bg={colors.background} position="relative">
       {/* Header */}
-      <YStack bg="$background" p="$4" pb="$2">
+      <YStack bg={colors.background} p="$4" pb="$2">
         <XStack w="100%" ai="center" jc="flex-start" mb="$3">
           <YStack ai="flex-start">
-            <Text fontSize={16} fontWeight="700">
+            <Text fontSize={16} fontWeight="700" color={colors.text}>
               Bill Summary
             </Text>
             {receiptId && (
@@ -479,26 +506,27 @@ export default function FinishScreen() {
 
         {/* Grand Total */}
         {grandTotalParts && (
-          <YStack
-            p="$3"
-            borderWidth={1}
-            borderColor="#2ECC71"
-            borderRadius={12}
-            bg="#2ECC711A"
-            mb="$3"
-          >
-            <Text fontSize={13} color="$gray11" mb="$1">
-              Total Amount
-            </Text>
-            <XStack ai="baseline" gap="$1">
-              <Text fontSize={14} color="#2ECC71">
-                {grandTotalParts.currency}
+          <Animated.View entering={entryAnim ? ZoomIn.duration(320).springify().damping(20) : undefined}>
+            <YStack
+              p="$3.5"
+              borderRadius={appRadii.lg}
+              mb="$3"
+              {...greenSurface}
+              {...appShadow.soft}
+            >
+              <Text fontSize={13} color={colors.textMuted} mb="$1">
+                Total Amount
               </Text>
-              <Text fontSize={24} fontWeight="700" color="#2ECC71">
-                {grandTotalParts.amount}
-              </Text>
-            </XStack>
-          </YStack>
+              <XStack ai="baseline" gap="$1">
+                <Text fontSize={14} color={colors.primary}>
+                  {grandTotalParts.currency}
+                </Text>
+                <Text fontSize={24} fontWeight="700" color={colors.primary}>
+                  {grandTotalParts.amount}
+                </Text>
+              </XStack>
+            </YStack>
+          </Animated.View>
         )}
       </YStack>
 
@@ -513,37 +541,46 @@ export default function FinishScreen() {
             Split by participant:
           </Text>
           {participantSummaries.length > 0 ? (
-            participantSummaries.map((summary) => {
+            participantSummaries.map((summary, index) => {
               const parts = getCurrencyParts(summary.amount, currency);
 
               return (
-                <XStack
+                <Animated.View
                   key={summary.uniqueId}
-                  h={60}
-                  ai="center"
-                  jc="space-between"
-                  w="100%"
-                  px={16}
-                  borderWidth={1}
-                  borderColor="$gray5"
-                  borderRadius={12}
-                  bg="$color1"
+                  entering={
+                    entryAnim
+                      ? FadeInDown.delay(index * 40).duration(280).springify().damping(22)
+                      : undefined
+                  }
                 >
-                  <XStack ai="center" gap="$3">
-                    <Avatar name={summary.username} />
-                    <Text fontWeight="600" fontSize={15}>
-                      {summary.username}
-                    </Text>
+                  <XStack
+                    h={60}
+                    ai="center"
+                    jc="space-between"
+                    w="100%"
+                    px={16}
+                    borderWidth={1}
+                    borderColor={colors.border}
+                    borderRadius={appRadii.lg}
+                    bg={colors.card}
+                    {...appShadow.soft}
+                  >
+                    <XStack ai="center" gap="$3">
+                      <Avatar name={summary.username} />
+                      <Text fontWeight="600" fontSize={15} color={colors.text}>
+                        {summary.username}
+                      </Text>
+                    </XStack>
+                    <XStack ai="baseline" gap="$1">
+                      <Text fontSize={12} color={colors.textMuted}>
+                        {parts.currency}
+                      </Text>
+                      <Text fontSize={18} fontWeight="700" color={colors.primary}>
+                        {parts.amount}
+                      </Text>
+                    </XStack>
                   </XStack>
-                  <XStack ai="baseline" gap="$1">
-                    <Text fontSize={12} color="$gray10">
-                      {parts.currency}
-                    </Text>
-                    <Text fontSize={18} fontWeight="700" color="#2ECC71">
-                      {parts.amount}
-                    </Text>
-                  </XStack>
-                </XStack>
+                </Animated.View>
               );
             })
           ) : (
@@ -629,30 +666,48 @@ export default function FinishScreen() {
         px="$4"
         gap="$2.5"
       >
-        <Button
-          unstyled
-          height={41}
-          borderRadius={10}
-          borderWidth={1}
-          borderColor="#2ECC71"
-          bg={savedHabits ? '#2ECC711A' : 'transparent'}
-          ai="center"
-          jc="center"
-          disabled={savedHabits}
-          onPress={saveCurrentSessionToHabits}
-          pressStyle={savedHabits ? undefined : { opacity: 0.9 }}
-          opacity={savedHabits ? 0.9 : 1}
-        >
-          <Text fontSize={16} fontWeight="600" color="#2ECC71">
-            {savedHabits ? '✓ Splits saved to Quick Habits' : '💾 Save Splits to Quick Habits'}
-          </Text>
-        </Button>
+        <XStack gap="$2.5">
+          <Button
+            unstyled
+            f={1}
+            height={41}
+            borderRadius={10}
+            {...greenOutline}
+            bg="transparent"
+            ai="center"
+            jc="center"
+            onPress={saveCurrentSessionToHabits}
+            pressStyle={{ opacity: 0.9 }}
+          >
+            <Text fontSize={15} fontWeight="600" color={colors.primary}>
+              {t('quickHabits.saveAsTemplate', 'Save as Quick Habit')}
+            </Text>
+          </Button>
+
+          <Button
+            unstyled
+            height={41}
+            px="$3.5"
+            borderRadius={10}
+            {...greenOutline}
+            bg="transparent"
+            ai="center"
+            jc="center"
+            onPress={handleShare}
+            pressStyle={{ opacity: 0.9 }}
+            disabled={!showGrandTotal}
+            opacity={showGrandTotal ? 1 : 0.5}
+            accessibilityLabel={t('finish.share', 'Share')}
+          >
+            <Share2 size={18} color={colors.primary} />
+          </Button>
+        </XStack>
 
         <Button
           unstyled
           height={41}
           borderRadius={10}
-          bg="#2ECC71"
+          bg={colors.primary}
           ai="center"
           jc="center"
           onPress={() => router.replace('/tabs')}
@@ -663,6 +718,30 @@ export default function FinishScreen() {
           </Text>
         </Button>
       </YStack>
+
+      {showConfetti && (
+        <YStack position="absolute" t={0} l={0} r={0} b={0} zIndex={1000} pointerEvents="none">
+          <Confetti />
+        </YStack>
+      )}
+
+      {showGrandTotal && (
+        <View
+          ref={shareCardRef}
+          collapsable={false}
+          style={{ position: 'absolute', left: -5000, top: 0, opacity: 0 }}
+        >
+          <ShareableSplitCard
+            sessionName={sessionName}
+            currency={currency}
+            grandTotal={effectiveGrandTotal}
+            participants={participantSummaries.map((p) => ({
+              username: p.username,
+              amount: p.amount,
+            }))}
+          />
+        </View>
+      )}
     </YStack>
   );
 }

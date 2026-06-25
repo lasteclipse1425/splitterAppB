@@ -41,7 +41,9 @@
     "cancel": "Bekor qilish",
     "confirm": "Tasdiqlash",
     "continue": "Davom etish",
-    "back": "Orqaga"
+    "back": "Orqaga",
+    "on": "Yoq",
+    "off": "O'ch"
   },
   "friends": {
     "title": "Do'stlar",
@@ -98,6 +100,11 @@
       "friends": "Do'stlar",
       "groups": "Guruhlar"
     },
+    "quickHabits": {
+      "title": "Odatlar bilan tez bo'lish",
+      "subtitle": "{{count}} ta saqlangan odat tayyor",
+      "empty": "Keyingi bo'linishdan keyin odat yarating"
+    },
     "recent": {
       "title": "So'nggi hisoblar",
       "showMore": "Ko'proq ko'rish",
@@ -132,7 +139,8 @@
       "upload": "Telefoningizdan yuklash",
       "uploading": "Yuklanmoqda...",
       "reset": "Avatarni tiklash",
-      "resetting": "Tiklanmoqda..."
+      "resetting": "Tiklanmoqda...",
+      "viewHint": "To'liq ko'rish uchun rasmga bosing"
     },
     "info": {
       "title": "Foydalanuvchi ma'lumotlari",
@@ -210,6 +218,20 @@
     "history": "So'nggi hisoblar",
     "historyDetails": "Hisob tafsilotlari"
   },
+  "groups": {
+    "debts": {
+      "title": "Balans",
+      "subtitle": "Guruhda kim kimga qancha qarzdor",
+      "loading": "Balans yuklanmoqda...",
+      "empty": "Hammasi to'langan",
+      "emptySubtitle": "Bu guruhda ochiq qarzlar yo'q",
+      "youOwe": "Siz {{name}} ga qarzdorsiz",
+      "owesYou": "{{name}} sizga qarzdor",
+      "owes": "{{from}} → {{to}}",
+      "remind": "Eslatish",
+      "mvpNote": "Hisob yaratuvchisi to'lagan sessiyalar asosida"
+    }
+  },
   "history": {
     "title": "Oxirgi hisoblar",
     "subtitle": "Bosh sahifa",
@@ -219,7 +241,27 @@
     "participants_one": "{{count}} ishtirokchi",
     "fallbackName": "Hisob"
   },
+  "finish": {
+    "share": "Ulashish"
+  },
   "settings": {
+    "theme": {
+      "title": "Ko'rinish",
+      "description": "Ilova qanday ko'rinishini tanlang.",
+      "options": {
+        "light": "Yorug'",
+        "dark": "Qorong'u",
+        "system": "Tizim"
+      }
+    },
+    "colorblind": {
+      "title": "Rang ko'rish uchun",
+      "description": "Yashil va qizil o'rniga ko'k va amber ishlatiladi."
+    },
+    "currency": {
+      "title": "Asosiy valyuta",
+      "description": "Valyuta aniq bo'lmaganda yangi cheklar uchun ishlatiladi."
+    },
     "language": {
       "title": "Til",
       "description": "Ilovada ishlatiladigan tilni tanlang.",
@@ -229,5 +271,63 @@
         "uz": "O'zbek tili"
       }
     }
+  },
+  "quickHabits": {
+    "title": "Tezkor odatlar",
+    "smartSplit": "Odatlar bo'yicha aqlli bo'lish",
+    "quickActions": "Tezkor amallar",
+    "foundMatches": "{{total}} tadan {{count}} tasi mos keldi",
+    "noMatchesHint": "Hammasini teng bo'ling yoki qoidalarni boshqaring",
+    "noMatches": "Joriy elementlar uchun mos odat yo'q",
+    "applyAll": "Hammasini qo'llash",
+    "applySelected": "Tanlanganlarni qo'llash ({{count}})",
+    "review": "Ko'rib chiqish",
+    "splitAllEqually": "Hammasini teng bo'lish",
+    "manageRules": "Qoidalarni boshqarish",
+    "suggestions": "Takliflar",
+    "create": "Yaratish",
+    "rules": "Qoidalar",
+    "selectItems": "Qo'llash uchun elementlarni tanlang",
+    "savedRule": "Saqlangan qoida",
+    "fromHistory": "{{name}} dan ({{date}})",
+    "itemPlaceholder": "Taom nomi (masalan, Pizza)...",
+    "equalSplit": "Teng bo'lish",
+    "byUnits": "Donalar bo'yicha",
+    "whoPays": "Kim to'laydi",
+    "createRule": "Qoida yaratish",
+    "activeHabits": "Faol odatlar ({{count}})",
+    "noCustomRules": "Hali maxsus qoidalar yo'q",
+    "noSessionHint": "Ishtirokchilarni tanlash uchun hisobni boshlang.",
+    "applied": "Odatlar qo'llanildi",
+    "undo": "Bekor qilish",
+    "saveToHabits": "Bo'linishlarni tezkor odatlarga saqlash",
+    "savedToHabits": "Tezkor odatlarga saqlandi",
+    "habitsTab": "Tezkor odatlar",
+    "selectHabits": "Bo'lish uchun odatlarni tanlang",
+    "selectAll": "Hammasini tanlash",
+    "clear": "Tozalash",
+    "startSplit": "Bo'lishni boshlash",
+    "startSplitCount": "Bo'lishni boshlash ({{count}})",
+    "pickParticipants": "Ishtirokchilarni tanlang",
+    "pickParticipantsHint": "Bu bo'linishda kim bo'lishini tanlang",
+    "searchPeople": "Do'stlarni qidirish...",
+    "continueSplit": "Davom etish",
+    "setPrices": "Narxlarni belgilash",
+    "setPricesHint": "Ba'zi odatlarda narx saqlanmagan",
+    "pricePlaceholder": "Birlik narxi",
+    "qtyPlaceholder": "Miqdor",
+    "editRule": "Qoidani tahrirlash",
+    "saveChanges": "O'zgarishlarni saqlash",
+    "createAnother": "Yana yaratish",
+    "draftList": "Shu sessiyada yaratilgan",
+    "saveAsTemplate": "Tezkor odat sifatida saqlash",
+    "saveAsTemplateHint": "Bu bo'linishni qayta ishlatiladigan odat shabloni sifatida saqlang",
+    "templateNamePlaceholder": "masalan, Ofis tushlik",
+    "templatePreview": "{{participants}} kishi · {{items}} ta · {{total}}",
+    "templateSaved": "Odat saqlandi",
+    "saveTemplate": "Odatni saqlash",
+    "defaultTemplateName": "Mening bo'linishim",
+    "noTemplates": "Hali saqlangan odatlar yo'q",
+    "noTemplatesHint": "Chekni skanerlab bo'lingandan keyin tezkor odat sifatida saqlang"
   }
 }

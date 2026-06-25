@@ -47,11 +47,12 @@ export const fontSize = {
 export const lightTheme = {
   colors: {
     ...colors,
-    background: colors.white,
-    surface: colors.gray[50],
-    text: colors.gray[900],
-    textSecondary: colors.gray[600],
-    border: colors.gray[200],
+    primary: '#2ECC71',
+    background: '#F7F9FA',
+    surface: '#FFFFFF',
+    text: '#24313F',
+    textSecondary: '#7B8794',
+    border: '#E7ECEF',
   },
   spacing,
   fontSize,

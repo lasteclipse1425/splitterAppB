@@ -2,19 +2,26 @@
 import { createTamagui } from '@tamagui/core'
 import { config } from '@tamagui/config/v3'
 
-// Простая и рабочая конфигурация
 const appConfig = createTamagui({
   ...config,
-  // Переопределяем только цвета
   themes: {
     ...config.themes,
     light: {
       ...config.themes.light,
+      background: '#F7F9FA',
+      backgroundHover: '#EEF2F5',
+      backgroundPress: '#E4EAEE',
+      backgroundFocus: '#DDE4EA',
+      color: '#24313F',
+      colorHover: '#1B2836',
+      colorPress: '#15202B',
+      borderColor: '#E7ECEF',
+      borderColorHover: '#D8E0E6',
       primary: '#2ECC71',
       primaryHover: '#27AE60',
       success: '#2ECC71',
-      error: '#F44336',
-      warning: '#FF9800',
+      error: '#E74C3C',
+      warning: '#F39C12',
     },
     dark: {
       ...config.themes.dark,

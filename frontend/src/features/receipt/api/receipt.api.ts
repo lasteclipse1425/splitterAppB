@@ -38,6 +38,13 @@ export interface ParseReceiptResponse {
   language: string;
   items: ParsedReceiptItem[];
   summary?: ReceiptSummary;
+  source?: 'gemini' | 'mock';
+  _parseMeta?: {
+    source?: string;
+    model?: string;
+    durationMs?: number;
+    modelsTried?: unknown[];
+  };
 }
 
 export type ReceiptParticipant = {
@@ -105,7 +112,21 @@ const normalizeError = (error: unknown): Error => {
   return new Error('Unexpected error');
 };
 
+export interface CreateSessionResponse {
+  id: number;
+}
+
 export const ReceiptApi = {
+  async createSession(): Promise<CreateSessionResponse> {
+    try {
+      const { data } = await apiClient.post<CreateSessionResponse>('/sessions', {});
+      return data;
+    } catch (error) {
+      console.error('[API] Error (createSession):', error);
+      throw normalizeError(error);
+    }
+  },
+
   async parse(payload: ParseReceiptRequest): Promise<ParseReceiptResponse> {
     try {
       // console.log('[API] POST /sessions/scan');
@@ -113,7 +134,14 @@ export const ReceiptApi = {
 
       const { data } = await apiClient.post<ParseReceiptResponse>('/sessions/scan', payload);
 
-      console.log('[API] Response:', JSON.stringify(data, null, 2));
+      if (__DEV__) {
+        console.log('[API] POST /sessions/scan →', {
+          source: data.source ?? 'unknown',
+          items: data.items?.length ?? 0,
+          currency: data.summary?.currency,
+          _parseMeta: data._parseMeta,
+        });
+      }
       return data;
     } catch (error) {
       console.error('[API] Error (parse):', error);

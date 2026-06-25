@@ -5,6 +5,8 @@ import { getCurrentUser } from '@/features/auth/api';
 import { getToken, removeToken } from '../utils/token-storage';
 import type { LanguageCode } from '@/shared/config/languages';
 import { DEFAULT_LANGUAGE } from '@/shared/config/languages';
+import type { CurrencyCode } from '@/shared/lib/money';
+import { DEFAULT_CURRENCY } from '@/shared/lib/money';
 
 export interface User {
   id: number;
@@ -14,6 +16,8 @@ export interface User {
   avatarUrl: string | null;
 }
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 interface AppStore {
   // Auth state
   token: string | null;
@@ -21,8 +25,10 @@ interface AppStore {
   isLoading: boolean;
   
   // App settings
-  theme: 'light' | 'dark';
+  themeMode: ThemeMode;
+  colorblind: boolean;
   language: LanguageCode;
+  defaultCurrency: CurrencyCode;
   
   // Actions
   setToken: (token: string) => void;
@@ -30,8 +36,10 @@ interface AppStore {
   setAuth: (token: string, user: User) => void;
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
-  setTheme: (theme: 'light' | 'dark') => void;
+  setThemeMode: (mode: ThemeMode) => void;
+  setColorblind: (enabled: boolean) => void;
   setLanguage: (language: LanguageCode) => void;
+  setDefaultCurrency: (currency: CurrencyCode) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -41,8 +49,10 @@ export const useAppStore = create<AppStore>()(
       token: null,
       user: null,
       isLoading: false,
-      theme: 'light',
+      themeMode: 'system',
+      colorblind: false,
       language: DEFAULT_LANGUAGE,
+      defaultCurrency: DEFAULT_CURRENCY,
 
       // Auth actions
       setToken: (token: string) => {
@@ -98,15 +108,19 @@ export const useAppStore = create<AppStore>()(
       },
 
       // App settings actions
-      setTheme: (theme) => set({ theme }),
+      setThemeMode: (themeMode) => set({ themeMode }),
+      setColorblind: (colorblind) => set({ colorblind }),
       setLanguage: (language) => set({ language }),
+      setDefaultCurrency: (defaultCurrency) => set({ defaultCurrency }),
     }),
     {
       name: 'app-store',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        theme: state.theme,
+        themeMode: state.themeMode,
+        colorblind: state.colorblind,
         language: state.language,
+        defaultCurrency: state.defaultCurrency,
         // Не сохраняем токен и пользователя в AsyncStorage, 
         // так как токен сохраняется отдельно в SecureStore
       }),

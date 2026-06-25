@@ -1,6 +1,8 @@
 import React, { ReactNode } from 'react';
 import { Platform, TextInputProps } from 'react-native';
 import { YStack, XStack, Text, Input as TInput } from 'tamagui';
+import { useAppColors } from '@/shared/ui/theme-context';
+import { appRadii } from '@/shared/ui/app-tokens';
 
 export type CustomInputProps = {
   id?: string;
@@ -14,11 +16,7 @@ export type CustomInputProps = {
   secureTextEntry?: boolean;
   error?: string;
   required?: boolean;
-
-  /** Иконка/кнопка справа (например, «глаз»). */
   rightAdornment?: ReactNode;
-
-  /** Любые нативные пропсы TextInput (returnKeyType, autoComplete и т.п.). */
   textInputProps?: Partial<TextInputProps>;
 };
 
@@ -37,6 +35,8 @@ export function Input({
   rightAdornment,
   textInputProps,
 }: CustomInputProps) {
+  const colors = useAppColors();
+
   const webIdentityProps: Record<string, string> | undefined =
     Platform.OS === 'web'
       ? {
@@ -48,7 +48,7 @@ export function Input({
   return (
     <YStack space="$2" w="100%">
       {!!label && (
-        <Text fontSize="$3" fontWeight="600" color="$gray11">
+        <Text fontSize="$3" fontWeight="600" color={colors.text}>
           {label}
           {required && <Text color="$red10"> *</Text>}
         </Text>
@@ -56,23 +56,22 @@ export function Input({
 
       <XStack position="relative" w="100%">
         <TInput
-          w="100%"      // >>> всегда на полную ширину строки
-          f={1}         // >>> растягивается внутри строки
+          w="100%"
+          f={1}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           secureTextEntry={secureTextEntry}
-          // запас под адорнмент справа
           paddingRight={rightAdornment ? 44 : undefined}
-          borderRadius="$4"
+          borderRadius={appRadii.md}
           borderWidth={1}
-          borderColor={error ? '$red8' : '$gray7'}
-          backgroundColor="$white1"
+          borderColor={error ? '$red8' : colors.border}
+          backgroundColor={colors.card}
           height="$4"
           fontSize="$4"
-          focusStyle={{ borderColor: error ? '$red8' : '$green9' }}
+          focusStyle={{ borderColor: error ? '$red8' : colors.primary }}
           {...webIdentityProps}
           {...textInputProps}
         />

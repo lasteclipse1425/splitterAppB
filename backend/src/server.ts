@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import dotenv from "dotenv";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
@@ -14,10 +15,41 @@ import uploadsRoutes from "./routes/uploads.js";
 import { logAuthAttempts } from "./middleware/logAuth.js";
 import debugRoutes from "./routes/debug.js";
 import { validateBackendEnv } from "./config/env.js";
+import {
+  getAvatarStorageMode,
+  getAvatarUploadsRoot,
+} from "./config/avatarStorage.js";
 
 // Load backend/.env for local npm development. Docker Compose injects the same
 // variables through its environment block.
 dotenv.config();
+
+function maskSecret(value?: string): string {
+  if (!value) return "(not set)";
+  if (value.length <= 10) return "***";
+  return `${value.slice(0, 6)}…${value.slice(-4)}`;
+}
+
+console.log(
+  `[startup] receipt parsing: GEMINI_API_KEY=${maskSecret(process.env.GEMINI_API_KEY)} DEBUG_PARSE=${process.env.DEBUG_PARSE ?? "0"} model=${process.env.GEMINI_MODEL_PARSE ?? "gemini-2.5-flash"}`
+);
+if (!process.env.GEMINI_API_KEY) {
+  console.warn("[startup] GEMINI_API_KEY missing — /sessions/scan will return MOCK items (Кола/Сервис)");
+}
+
+const avatarStorageMode = getAvatarStorageMode();
+console.log(
+  `[startup] avatar storage: ${avatarStorageMode}${
+    avatarStorageMode === "local"
+      ? ` (served from ${getAvatarUploadsRoot()} at /media/)`
+      : " (Cloudflare R2)"
+  }`
+);
+if (avatarStorageMode === "local") {
+  console.warn(
+    "[startup] R2 not configured — avatars are stored locally. Set R2_* and CDN_BASE_URL for production CDN uploads."
+  );
+}
 
 let env;
 try {
@@ -92,6 +124,7 @@ app.use("/groups", groupsRoutes);
 app.use("/sessions", sessionsRoutes);
 app.use("/users", usersRoutes);
 app.use("/uploads", uploadsRoutes);
+app.use("/media", express.static(path.resolve(getAvatarUploadsRoot())));
 app.use("/debug", debugRoutes);
 
 // Health check

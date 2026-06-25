@@ -1,6 +1,7 @@
 // src/shared/ui/Card.tsx
 import React from 'react'
 import { YStack } from 'tamagui'
+import { useAppTheme } from '@/shared/ui/theme-context'
 
 interface CardProps {
   children: React.ReactNode
@@ -11,19 +12,10 @@ export const Card: React.FC<CardProps> = ({
   children,
   padding = '$4'
 }) => {
+  const { surfaceCardProps } = useAppTheme()
+
   return (
-    <YStack
-      backgroundColor="$white1"
-      borderRadius="$6"
-      borderWidth={1}
-      borderColor="$gray5"
-      padding={padding}
-      shadowColor="$shadowColor"
-      shadowOffset={{ width: 0, height: 2 }}
-      shadowOpacity={0.1}
-      shadowRadius={8}
-      elevation={3}
-    >
+    <YStack padding={padding} {...surfaceCardProps}>
       {children}
     </YStack>
   )

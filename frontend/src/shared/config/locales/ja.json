@@ -43,7 +43,9 @@
     "cancel": "キャンセル",
     "confirm": "確認",
     "continue": "続ける",
-    "back": "戻る"
+    "back": "戻る",
+    "on": "オン",
+    "off": "オフ"
   },
   "friends": {
     "title": "友だち",
@@ -67,6 +69,11 @@
     "actions": {
       "friends": "友だち",
       "groups": "グループ"
+    },
+    "quickHabits": {
+      "title": "習慣からすぐ分割",
+      "subtitle": "保存済みの習慣 {{count}} 件",
+      "empty": "次の分割後に習慣を作成できます"
     },
     "recent": {
       "title": "最近の明細",
@@ -102,7 +109,8 @@
       "upload": "端末からアップロード",
       "uploading": "アップロード中...",
       "reset": "アバターをリセット",
-      "resetting": "リセット中..."
+      "resetting": "リセット中...",
+      "viewHint": "写真をタップして拡大表示"
     },
     "info": {
       "title": "ユーザー情報",
@@ -180,6 +188,20 @@
     "history": "最近の明細",
     "historyDetails": "明細の詳細"
   },
+  "groups": {
+    "debts": {
+      "title": "残高",
+      "subtitle": "グループ内の誰が誰にいくら払うか",
+      "loading": "残高を読み込み中...",
+      "empty": "精算済みです",
+      "emptySubtitle": "このグループに未払いの残高はありません",
+      "youOwe": "{{name}} に支払いがあります",
+      "owesYou": "{{name}} から受け取りがあります",
+      "owes": "{{from}} → {{to}}",
+      "remind": "リマインド",
+      "mvpNote": "作成者が支払ったセッションに基づきます"
+    }
+  },
   "history": {
     "title": "最近の明細",
     "subtitle": "ホーム",
@@ -189,7 +211,27 @@
     "participants_one": "{{count}} 人",
     "fallbackName": "明細"
   },
+  "finish": {
+    "share": "共有"
+  },
   "settings": {
+    "theme": {
+      "title": "外観",
+      "description": "アプリの表示モードを選びます。",
+      "options": {
+        "light": "ライト",
+        "dark": "ダーク",
+        "system": "システム"
+      }
+    },
+    "colorblind": {
+      "title": "色覚サポート",
+      "description": "緑と赤の代わりに青とアンバーを使います。"
+    },
+    "currency": {
+      "title": "デフォルト通貨",
+      "description": "通貨が不明なレシートに使われます。"
+    },
     "language": {
       "title": "言語",
       "description": "アプリ全体で使用する言語を選択してください。",
@@ -199,5 +241,63 @@
         "uz": "ウズベク語"
       }
     }
+  },
+  "quickHabits": {
+    "title": "クイック習慣",
+    "smartSplit": "習慣によるスマート分割",
+    "quickActions": "クイック操作",
+    "foundMatches": "{{total}}件中{{count}}件が一致",
+    "noMatchesHint": "全員均等に分割するか、ルールを管理",
+    "noMatches": "一致する習慣がありません",
+    "applyAll": "すべて適用",
+    "applySelected": "選択を適用 ({{count}})",
+    "review": "確認",
+    "splitAllEqually": "全員均等",
+    "manageRules": "ルール管理",
+    "suggestions": "提案",
+    "create": "作成",
+    "rules": "ルール",
+    "selectItems": "適用する項目を選択",
+    "savedRule": "保存済みルール",
+    "fromHistory": "{{name}}より ({{date}})",
+    "itemPlaceholder": "料理名 (例: ピザ)...",
+    "equalSplit": "均等分割",
+    "byUnits": "数量で分割",
+    "whoPays": "支払う人",
+    "createRule": "ルール作成",
+    "activeHabits": "有効な習慣 ({{count}})",
+    "noCustomRules": "カスタムルールはまだありません",
+    "noSessionHint": "参加者を選ぶには請求を開始してください。",
+    "applied": "習慣を適用しました",
+    "undo": "元に戻す",
+    "saveToHabits": "分割をクイック習慣に保存",
+    "savedToHabits": "クイック習慣に保存しました",
+    "habitsTab": "クイック習慣",
+    "selectHabits": "分割を始める習慣を選択",
+    "selectAll": "すべて選択",
+    "clear": "クリア",
+    "startSplit": "分割を開始",
+    "startSplitCount": "分割を開始 ({{count}})",
+    "pickParticipants": "参加者を選択",
+    "pickParticipantsHint": "この分割に含める人を選んでください",
+    "searchPeople": "友だちを検索...",
+    "continueSplit": "続ける",
+    "setPrices": "価格を設定",
+    "setPricesHint": "価格が未設定の習慣があります",
+    "pricePlaceholder": "単価",
+    "qtyPlaceholder": "数量",
+    "editRule": "ルールを編集",
+    "saveChanges": "変更を保存",
+    "createAnother": "もう1つ作成",
+    "draftList": "このセッションで作成",
+    "saveAsTemplate": "クイック習慣として保存",
+    "saveAsTemplateHint": "この分割を再利用できる習慣テンプレートとして保存",
+    "templateNamePlaceholder": "例: オフィスランチ",
+    "templatePreview": "{{participants}}人 · {{items}}品 · {{total}}",
+    "templateSaved": "習慣を保存しました",
+    "saveTemplate": "習慣を保存",
+    "defaultTemplateName": "マイ分割",
+    "noTemplates": "保存された習慣はまだありません",
+    "noTemplatesHint": "請求をスキャンして分割した後、クイック習慣として保存できます"
   }
 }

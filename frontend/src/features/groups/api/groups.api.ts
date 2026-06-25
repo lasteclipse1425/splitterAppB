@@ -26,6 +26,12 @@ export type GroupDetails = {
   role: 'owner' | 'member'; // current user's role
 };
 
+export type GroupDebt = {
+  from: string;
+  to: string;
+  amount: number;
+};
+
 export const GroupsApi = {
   async list(): Promise<Group[]> {
     const { data } = await apiClient.get('/groups');
@@ -76,6 +82,11 @@ export const GroupsApi = {
   /** POST /groups/join { token } -> 200 */
   async joinByToken(token: string) {
     const { data } = await apiClient.post('/groups/join', { token });
+    return data;
+  },
+
+  async getDebts(groupId: number): Promise<GroupDebt[]> {
+    const { data } = await apiClient.get(`/groups/${groupId}/debts`);
     return data;
   },
 };

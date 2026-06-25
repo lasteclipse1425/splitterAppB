@@ -4,12 +4,18 @@ import {
   YStack, XStack, Paragraph, Separator, Button, Input, Spinner, Text
 } from 'tamagui';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Crown, Pencil, Trash2, Check, X as IconX, ChevronLeft, QrCode } from '@tamagui/lucide-icons';
+import { useTranslation } from 'react-i18next';
+import { Crown, Pencil, Trash2, Check, X as IconX, ChevronLeft, QrCode, Scale } from '@tamagui/lucide-icons';
 
 import { useGroupsStore } from '@/features/groups/model/groups.store';
 import { useFriendsStore } from '@/features/friends/model/friends.store';
+import { GroupsApi, type GroupDebt } from '@/features/groups/api/groups.api';
 import UserAvatar from '@/shared/ui/UserAvatar';
+import { EmptyState } from '@/shared/ui/EmptyState';
 import { useAppStore } from '@/shared/lib/stores/app-store';
+import { shareDebtReminder } from '@/shared/lib/utils/share-split';
+import { tapLight } from '@/shared/lib/haptics';
+import { formatMoney } from '@/shared/lib/money';
 
 const fmtUid = (uid?: string) => (uid ? `@${uid.toLowerCase().replace('user#','user')}` : '');
 
@@ -29,19 +35,43 @@ export default function GroupDetailsScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const gid = Number(groupId);
   const router = useRouter();
+  const { t } = useTranslation();
 
   const { current, loading, error, openGroup, renameGroup, deleteGroup, addMember, removeMember } = useGroupsStore();
   const { friends, fetchAll: fetchFriends } = useFriendsStore();
   const me = useAppStore(s => s.user);
+  const debtsCurrency = useAppStore(s => s.defaultCurrency);
 
   const [editing, setEditing] = useState(false);
   const [newName, setNewName] = useState('');
   const [filter, setFilter] = useState('');
   const [opUid, setOpUid] = useState<string | null>(null);
   const [busyHdr, setBusyHdr] = useState<string | number | undefined>();
+  const [debts, setDebts] = useState<GroupDebt[]>([]);
+  const [debtsLoading, setDebtsLoading] = useState(false);
+  const [debtsError, setDebtsError] = useState<string | null>(null);
 
   useEffect(() => { if (gid) openGroup(gid); }, [gid, openGroup]);
   useEffect(() => { if (!friends?.length) fetchFriends(); }, [friends?.length, fetchFriends]);
+  useEffect(() => {
+    if (!gid || Number.isNaN(gid)) return;
+    let cancelled = false;
+    setDebtsLoading(true);
+    setDebtsError(null);
+    GroupsApi.getDebts(gid)
+      .then((data) => {
+        if (!cancelled) setDebts(data);
+      })
+      .catch(() => {
+        if (!cancelled) setDebtsError(t('common.error', 'Error'));
+      })
+      .finally(() => {
+        if (!cancelled) setDebtsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gid, current?.group?.id, t]);
   useEffect(() => {
     if (current?.group?.name) { setNewName(current.group.name!); setEditing(false); }
   }, [current?.group?.name]);
@@ -50,6 +80,49 @@ export default function GroupDetailsScreen() {
   const title = current?.group?.name ?? 'Group';
   const members = useMemo(() => current?.members ?? [], [current]);
   const ownerId = current?.group?.ownerId;
+  const myUniqueId = me?.uniqueId?.toUpperCase() ?? '';
+
+  const nameByUid = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of members) {
+      if (m.uniqueId) {
+        map.set(m.uniqueId.toUpperCase(), m.displayName || m.username || m.uniqueId);
+      }
+    }
+    return map;
+  }, [members]);
+
+  const resolveName = (uid: string) => nameByUid.get(uid.toUpperCase()) || uid;
+
+  const formatDebtLabel = (debt: GroupDebt) => {
+    const fromId = debt.from.toUpperCase();
+    const toId = debt.to.toUpperCase();
+    const fromName = resolveName(debt.from);
+    const toName = resolveName(debt.to);
+
+    if (fromId === myUniqueId) {
+      return t('groups.debts.youOwe', { name: toName, defaultValue: `You owe ${toName}` });
+    }
+    if (toId === myUniqueId) {
+      return t('groups.debts.owesYou', { name: fromName, defaultValue: `${fromName} owes you` });
+    }
+    return t('groups.debts.owes', {
+      from: fromName,
+      to: toName,
+      defaultValue: `${fromName} owes ${toName}`,
+    });
+  };
+
+  const handleRemindDebt = (debt: GroupDebt) => {
+    void tapLight();
+    void shareDebtReminder({
+      fromName: resolveName(debt.from),
+      toName: resolveName(debt.to),
+      amount: debt.amount,
+      currency: debtsCurrency,
+      groupName: title,
+    });
+  };
 
   const memberSetUpper = useMemo(
     () => new Set((members ?? []).map(m => (m?.uniqueId || '').toUpperCase())),
@@ -284,6 +357,66 @@ export default function GroupDetailsScreen() {
           })}
         </YStack>
       )}
+
+      <Separator />
+
+      {/* BALANCES */}
+      <YStack gap="$2">
+        <Paragraph fow="700" fos="$6">{t('groups.debts.title', 'Balances')}</Paragraph>
+        <Paragraph col="$gray10" fontSize={13}>
+          {t('groups.debts.subtitle', 'Who owes whom across group bills')}
+        </Paragraph>
+        <Paragraph col="$gray9" fontSize={11}>
+          {t('groups.debts.mvpNote', 'Based on sessions where the bill creator paid')}
+        </Paragraph>
+
+        {debtsLoading && (
+          <XStack ai="center" gap="$2" py="$2">
+            <Spinner size="small" />
+            <Text fontSize={13} color="$gray10">
+              {t('groups.debts.loading', 'Loading balances...')}
+            </Text>
+          </XStack>
+        )}
+
+        {debtsError && <Paragraph col="$red10">{debtsError}</Paragraph>}
+
+        {!debtsLoading && !debtsError && debts.length === 0 && (
+          <EmptyState
+            icon={Scale}
+            title={t('groups.debts.empty', 'All settled up')}
+            subtitle={t('groups.debts.emptySubtitle', 'No outstanding balances in this group')}
+          />
+        )}
+
+        {!debtsLoading && debts.length > 0 && (
+          <YStack borderWidth={1} borderColor="$gray5" borderRadius={8} overflow="hidden">
+            {debts.map((debt, idx) => {
+              const fromId = debt.from.toUpperCase();
+              const toId = debt.to.toUpperCase();
+              const isMine = fromId === myUniqueId || toId === myUniqueId;
+              return (
+                <React.Fragment key={`${debt.from}-${debt.to}-${idx}`}>
+                  <XStack ai="center" jc="space-between" px="$4" py="$3" bg={isMine ? '$green3' : '$background'}>
+                    <YStack f={1} pr="$2" gap="$1">
+                      <Text fontSize={15} fontWeight={isMine ? '700' : '600'}>
+                        {formatDebtLabel(debt)}
+                      </Text>
+                      <Text fontSize={14} color="$gray11" fontWeight="700">
+                        {formatMoney(debt.amount, debtsCurrency)}
+                      </Text>
+                    </YStack>
+                    <Button size="$2" theme="gray" onPress={() => handleRemindDebt(debt)}>
+                      {t('groups.debts.remind', 'Remind')}
+                    </Button>
+                  </XStack>
+                  {idx < debts.length - 1 && <Separator />}
+                </React.Fragment>
+              );
+            })}
+          </YStack>
+        )}
+      </YStack>
 
       <Separator />
 

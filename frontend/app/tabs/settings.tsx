@@ -1,7 +1,7 @@
 // app/tabs/settings.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { YStack, Text, Separator, XStack } from 'tamagui';
+import { YStack, Text, XStack } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -9,12 +9,20 @@ import { Button } from '@/shared/ui/Button';
 import { ScreenContainer } from '@/shared/ui/ScreenContainer';
 import Input from '@/shared/ui/Input';
 import PasswordInput from '@/shared/ui/PasswordInput';
-import { useAppStore } from '@/shared/lib/stores/app-store';
+import { FadeInView } from '@/shared/ui/FadeInView';
+import { appRadii } from '@/shared/ui/app-tokens';
+import { useAppTheme } from '@/shared/ui/theme-context';
+import { useEntryAnimation } from '@/shared/lib/hooks/useEntryAnimation';
+import { tapLight } from '@/shared/lib/haptics';
+import { useAppStore, type ThemeMode } from '@/shared/lib/stores/app-store';
 import { changePassword, updateUsername } from '@/features/auth/api';
 import { LANGUAGE_OPTIONS, type LanguageCode } from '@/shared/config/languages';
+import { ThemeModeSegmentedControl } from '@/shared/ui/ThemeModeSegmentedControl';
+import { CurrencySegmentedControl } from '@/shared/ui/CurrencySegmentedControl';
+import type { CurrencyCode } from '@/shared/lib/money';
 
 export default function SettingsScreen() {
-  const { user, setUser, language, setLanguage } = useAppStore();
+  const { user, setUser, language, setLanguage, themeMode, setThemeMode, colorblind, setColorblind, defaultCurrency, setDefaultCurrency } = useAppStore();
   const { t } = useTranslation();
   const isLoggedIn = !!user;
 
@@ -61,6 +69,7 @@ export default function SettingsScreen() {
 
   const handleLanguageChange = (code: LanguageCode) => {
     if (code === language) return;
+    void tapLight();
     setLanguage(code);
   };
 
@@ -134,8 +143,11 @@ export default function SettingsScreen() {
     }
   }, [currentPassword, newPassword, confirmPassword, passwordError]);
 
+  const entryAnim = useEntryAnimation();
+  const { colors, surfaceCardProps } = useAppTheme();
+
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -148,29 +160,87 @@ export default function SettingsScreen() {
         >
           <ScreenContainer>
             <YStack space="$5">
+              <FadeInView index={0} enabled={entryAnim}>
               {/* Header */}
-              <YStack space="$3" mt="$4">
-                <Text fontSize={20} fontWeight="700">
+              <YStack space="$3" mt="$2">
+                <Text fontSize={20} fontWeight="700" color={colors.text}>
                   Account settings
                 </Text>
-                <Text color="$gray10">
+                <Text color={colors.textMuted}>
                   Update your username and password using the forms below.
                 </Text>
               </YStack>
+              </FadeInView>
 
+              <FadeInView index={1} enabled={entryAnim}>
+              {/* APPEARANCE */}
+              <YStack space="$3" p="$4" {...surfaceCardProps}>
+                <Text fontSize={16} fontWeight="600" color={colors.text}>
+                  {t('settings.theme.title', 'Appearance')}
+                </Text>
+                <Text fontSize={14} color={colors.textMuted}>
+                  {t('settings.theme.description', 'Choose how the app looks on your device.')}
+                </Text>
+                <ThemeModeSegmentedControl
+                  value={themeMode}
+                  onChange={(mode: ThemeMode) => {
+                    if (mode !== themeMode) void tapLight();
+                    setThemeMode(mode);
+                  }}
+                  getLabel={(key, fallback) => t(key, fallback)}
+                />
+                <XStack ai="center" jc="space-between" pt="$1">
+                  <YStack f={1} pr="$3">
+                    <Text fontSize={14} fontWeight="600" color={colors.text}>
+                      {t('settings.colorblind.title', 'Colorblind-friendly')}
+                    </Text>
+                    <Text fontSize={12} color={colors.textMuted}>
+                      {t('settings.colorblind.description', 'Uses blue and amber instead of green and red.')}
+                    </Text>
+                  </YStack>
+                  <Button
+                    title={colorblind ? t('common.on', 'On') : t('common.off', 'Off')}
+                    variant={colorblind ? 'primary' : 'outline'}
+                    size="small"
+                    onPress={() => {
+                      void tapLight();
+                      setColorblind(!colorblind);
+                    }}
+                  />
+                </XStack>
+
+                <YStack gap="$1.5" pt="$1">
+                  <Text fontSize={14} fontWeight="600" color={colors.text}>
+                    {t('settings.currency.title', 'Default currency')}
+                  </Text>
+                  <Text fontSize={12} color={colors.textMuted}>
+                    {t('settings.currency.description', 'Used for new receipts when the currency is unclear.')}
+                  </Text>
+                  <CurrencySegmentedControl
+                    value={defaultCurrency}
+                    onChange={(code: CurrencyCode) => {
+                      if (code !== defaultCurrency) void tapLight();
+                      setDefaultCurrency(code);
+                    }}
+                  />
+                </YStack>
+              </YStack>
+              </FadeInView>
+
+              <FadeInView index={2} enabled={entryAnim}>
               {/* LANGUAGE */}
-              <YStack space="$3">
-                <Text fontSize={16} fontWeight="600">
+              <YStack space="$3" p="$4" {...surfaceCardProps}>
+                <Text fontSize={16} fontWeight="600" color={colors.text}>
                   {t('settings.language.title', 'Language')}
                 </Text>
-                <Text fontSize={14} color="$gray10">
+                <Text fontSize={14} color={colors.textMuted}>
                   {t('settings.language.description', 'Choose the language used across the app.')}
                 </Text>
 
                 <XStack
                   space="$2"
-                  backgroundColor="$gray3"
-                  borderRadius="$8"
+                  backgroundColor={colors.borderSoft}
+                  borderRadius={appRadii.lg}
                   padding="$1"
                   flexWrap="wrap"
                 >
@@ -192,12 +262,12 @@ export default function SettingsScreen() {
                   })}
                 </XStack>
               </YStack>
+              </FadeInView>
 
-              <Separator />
-
+              <FadeInView index={3} enabled={entryAnim}>
               {/* USERNAME */}
-              <YStack space="$3">
-                <Text fontSize={16} fontWeight="600">Username</Text>
+              <YStack space="$3" p="$4" {...surfaceCardProps}>
+                <Text fontSize={16} fontWeight="600" color={colors.text}>Username</Text>
                 <Input
                   value={usernameValue}
                   onChangeText={setUsernameValue}
@@ -222,12 +292,12 @@ export default function SettingsScreen() {
                   />
                 </XStack>
               </YStack>
+              </FadeInView>
 
-              <Separator />
-
+              <FadeInView index={4} enabled={entryAnim}>
               {/* PASSWORD */}
-              <YStack space="$3">
-                <Text fontSize={16} fontWeight="600">Password</Text>
+              <YStack space="$3" p="$4" {...surfaceCardProps}>
+                <Text fontSize={16} fontWeight="600" color={colors.text}>Password</Text>
                 <PasswordInput
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
@@ -240,7 +310,7 @@ export default function SettingsScreen() {
                   placeholder="New password"
                   textInputProps={{ returnKeyType: 'next' }}
                 />
-                <Text fontSize={12} color="$gray10">
+                <Text fontSize={12} color={colors.textMuted}>
                   Password must be at least 8 characters and include uppercase, lowercase, number, and special symbol.
                 </Text>
                 <PasswordInput
@@ -258,6 +328,7 @@ export default function SettingsScreen() {
                   onPress={handleChangePassword}
                 />
               </YStack>
+              </FadeInView>
             </YStack>
           </ScreenContainer>
         </ScrollView>

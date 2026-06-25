@@ -22,6 +22,45 @@ function parseParticipantUniqueIds(value: Prisma.JsonValue): string[] {
   return value.filter((id): id is string => typeof id === "string");
 }
 
+async function fetchAvatarMap(
+  uniqueIds: string[]
+): Promise<Map<string, string | null>> {
+  const ids = [...new Set(uniqueIds.filter(Boolean))];
+  if (!ids.length) return new Map();
+  const users = await prisma.user.findMany({
+    where: { uniqueId: { in: ids } },
+    select: { uniqueId: true, avatarUrl: true },
+  });
+  return new Map(users.map((u) => [u.uniqueId, u.avatarUrl ?? null]));
+}
+
+function enrichPayloadAvatars(
+  payload: Prisma.JsonValue,
+  avatarMap: Map<string, string | null>
+): Prisma.JsonValue {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+  const record = payload as Record<string, unknown>;
+  const totals = record.totals as Record<string, unknown> | undefined;
+  if (!totals || !Array.isArray(totals.byParticipant)) return payload;
+
+  const byParticipant = (totals.byParticipant as Record<string, unknown>[]).map(
+    (p) => ({
+      ...p,
+      avatarUrl:
+        (typeof p.avatarUrl === "string" ? p.avatarUrl : null) ??
+        avatarMap.get(String(p.uniqueId)) ??
+        null,
+    })
+  );
+
+  return {
+    ...record,
+    totals: { ...totals, byParticipant },
+  };
+}
+
 /**
  * @swagger
  * /sessions/scan:
@@ -115,12 +154,28 @@ router.post(
         select: { id: true },
       });
 
+      const imageKb = Math.round((String(image.data).length * 3) / 4 / 1024);
+      console.log(
+        `[POST /sessions/scan] user=${req.user.id} name="${sessionName}" lang=${language} image≈${imageKb}KB mime=${image.mimeType}`
+      );
+
+      const scanStarted = Date.now();
       const parseResult = await parseReceipt({
         language,
         sessionName,
         mimeType: image.mimeType,
         imageBase64: image.data,
       });
+
+      const elapsed = Date.now() - scanStarted;
+      console.log(
+        `[POST /sessions/scan] sessionId=${session.id} source=${parseResult.source} model=${parseResult.model ?? "-"} items=${parseResult.items.length} currency=${parseResult.summary?.currency ?? "?"} ms=${parseResult.durationMs ?? elapsed}`
+      );
+      if (parseResult.source === "mock") {
+        console.warn(
+          "[POST /sessions/scan] MOCK data returned — see [parseReceipt] logs above (key missing, API error, or bad JSON)"
+        );
+      }
 
       return res.json({
         sessionId: session.id,
@@ -129,6 +184,16 @@ router.post(
         items: parseResult.items,
         summary: parseResult.summary,
         source: parseResult.source,
+        ...(process.env.DEBUG_PARSE === "1" || process.env.NODE_ENV !== "production"
+          ? {
+              _parseMeta: {
+                source: parseResult.source,
+                model: parseResult.model,
+                durationMs: parseResult.durationMs,
+                modelsTried: parseResult.modelsTried,
+              },
+            }
+          : {}),
         ...(process.env.DEBUG_PARSE === "1" && parseResult.rawModelText
           ? {
               _debug: {
@@ -627,6 +692,7 @@ router.post(
       }
       const byItem = Array.from(byItemMap.values());
       const grandTotal = round2(byItem.reduce((s, it) => s + it.total, 0));
+      const avatarMap = await fetchAvatarMap(pList.map((p) => p.uniqueId));
       const byParticipant = pList.map((p) => {
         const amount = round2(byParticipantTotals.get(p.uniqueId) || 0);
         return {
@@ -635,6 +701,7 @@ router.post(
           amountOwed: amount,
           participantId: p.uniqueId,
           total: amount,
+          avatarUrl: avatarMap.get(p.uniqueId) ?? null,
         };
       });
       if (process.env.DEBUG_PARSE === "1") {
@@ -781,6 +848,33 @@ router.get(
         entries = entries.slice(0, limit);
       }
 
+      const allParticipantIds = entries.flatMap((entry) => {
+        const fromPayload =
+          entry.payload &&
+          typeof entry.payload === "object" &&
+          !Array.isArray(entry.payload)
+            ? (
+                (entry.payload as Record<string, unknown>).totals as
+                  | Record<string, unknown>
+                  | undefined
+              )?.byParticipant
+            : undefined;
+        const fromPayloadIds = Array.isArray(fromPayload)
+          ? fromPayload
+              .map((p) =>
+                p && typeof p === "object" && "uniqueId" in p
+                  ? String((p as { uniqueId: unknown }).uniqueId)
+                  : ""
+              )
+              .filter(Boolean)
+          : [];
+        return [
+          ...parseParticipantUniqueIds(entry.participantUniqueIds),
+          ...fromPayloadIds,
+        ];
+      });
+      const avatarMap = await fetchAvatarMap(allParticipantIds);
+
       const response = entries.map((entry) => ({
         sessionId: entry.sessionId,
         sessionName: entry.sessionName,
@@ -791,7 +885,7 @@ router.get(
           entry.participantUniqueIds
         ),
         isCreator: entry.creatorId === requesterId,
-        payload: entry.payload,
+        payload: enrichPayloadAvatars(entry.payload, avatarMap),
       }));
 
       return res.json({

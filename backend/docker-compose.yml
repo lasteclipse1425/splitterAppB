@@ -16,8 +16,10 @@ services:
       JWT_SECRET: student_dev_jwt_secret_change_me
       ALLOW_ALL_CORS: 1
       JSON_BODY_LIMIT: 4mb
-      # НАША ДОБАВКА 2: Открываем бэкенд для внешней сети (вашего телефона)
       HOST: 0.0.0.0
+    # Pass backend/.env into the container (GEMINI_API_KEY, DEBUG_PARSE, etc.)
+    env_file:
+      - .env
     volumes:
       - sqlite_data:/app/data
     ports:

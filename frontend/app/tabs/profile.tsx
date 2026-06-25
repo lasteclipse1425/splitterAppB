@@ -1,26 +1,34 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, KeyboardAvoidingView, Platform, ScrollView, TextInputProps } from 'react-native';
+import { Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInputProps } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { YStack, XStack, Text, Button, Separator, Spinner } from 'tamagui';
-import { Copy, LogOut, Upload, RotateCcw, CheckCircle, User as UserIcon, Mail, Lock, Edit3, X, Check, Languages } from '@tamagui/lucide-icons';
+import { Copy, LogOut, Upload, RotateCcw, CheckCircle, User as UserIcon, Mail, Lock, Edit3, X, Check, Languages, Palette } from '@tamagui/lucide-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/shared/ui/ScreenContainer';
 import UserAvatar from '@/shared/ui/UserAvatar';
 import Input from '@/shared/ui/Input';
 import PasswordInput from '@/shared/ui/PasswordInput';
-import { useAppStore } from '@/shared/lib/stores/app-store';
+import { FadeInView } from '@/shared/ui/FadeInView';
+import { useAppTheme } from '@/shared/ui/theme-context';
+import { useEntryAnimation } from '@/shared/lib/hooks/useEntryAnimation';
+import { useAppStore, type ThemeMode } from '@/shared/lib/stores/app-store';
 import { changePassword, resetAvatar, updateEmail, updateUsername, uploadAvatar } from '@/features/auth/api';
 import { LANGUAGE_OPTIONS, type LanguageCode } from '@/shared/config/languages';
 import { LanguageSegmentedControl } from '@/shared/ui/LanguageSegmentedControl';
+import { ThemeModeSegmentedControl } from '@/shared/ui/ThemeModeSegmentedControl';
+import { CurrencySegmentedControl } from '@/shared/ui/CurrencySegmentedControl';
+import type { CurrencyCode } from '@/shared/lib/money';
+import { Button as AppButton } from '@/shared/ui/Button';
+import { tapLight } from '@/shared/lib/haptics';
 
 type SuccessKey = 'avatar' | 'password';
 type StatusState = 'idle' | 'saving' | 'success';
 
 const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
-  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  mediaTypes: ['images'],
   allowsEditing: true,
   aspect: [1, 1],
   quality: 0.9,
@@ -34,20 +42,18 @@ interface SectionCardProps {
 }
 
 function SectionCard({ title, icon, children, successTrigger = 0 }: SectionCardProps) {
+  const { surfaceCardProps, colors } = useAppTheme();
   return (
     <YStack
-      borderWidth={1}
-      borderColor="$gray5"
-      borderRadius={16}
       padding="$4"
       gap="$3"
-      backgroundColor="$background"
       position="relative"
+      {...surfaceCardProps}
     >
       <XStack ai="center" jc="space-between">
         <XStack ai="center" gap="$2">
           {icon}
-          <Text fontSize={16} fontWeight="700">
+          <Text fontSize={16} fontWeight="700" color={colors.text}>
             {title}
           </Text>
         </XStack>
@@ -124,13 +130,14 @@ interface InfoRowProps {
 
 function InfoRow({ label, value, onCopy }: InfoRowProps) {
   const { t } = useTranslation();
+  const { colors } = useAppTheme();
   return (
     <YStack gap="$1">
-      <Text fontSize={12} color="$gray9">
+      <Text fontSize={12} color={colors.textMuted}>
         {label}
       </Text>
       <XStack ai="center" jc="space-between">
-        <Text fontSize={16} fontWeight="600">
+        <Text fontSize={16} fontWeight="600" color={colors.text}>
           {value || '—'}
         </Text>
         {onCopy && (
@@ -274,6 +281,12 @@ export default function ProfileScreen() {
   const language = useAppStore((s) => s.language);
   const { t } = useTranslation();
   const setLanguage = useAppStore((s) => s.setLanguage);
+  const themeMode = useAppStore((s) => s.themeMode);
+  const setThemeMode = useAppStore((s) => s.setThemeMode);
+  const colorblind = useAppStore((s) => s.colorblind);
+  const setColorblind = useAppStore((s) => s.setColorblind);
+  const defaultCurrency = useAppStore((s) => s.defaultCurrency);
+  const setDefaultCurrency = useAppStore((s) => s.setDefaultCurrency);
 
   const guestLabel = t('profile.labels.guest', 'Guest');
   const notAvailableLabel = t('profile.labels.notAvailable', 'N/A');
@@ -286,6 +299,7 @@ export default function ProfileScreen() {
   const avatarUploadingLabel = t('profile.avatar.uploading', 'Uploading...');
   const avatarResetLabel = t('profile.avatar.reset', 'Reset avatar');
   const avatarResettingLabel = t('profile.avatar.resetting', 'Resetting...');
+  const avatarViewHint = t('profile.avatar.viewHint', 'Tap the photo to view full size');
   const userInfoTitle = t('profile.info.title', 'User information');
   const usernameLabel = t('profile.info.usernameLabel', 'Username');
   const usernamePlaceholder = t('profile.info.usernamePlaceholder', 'Enter a new username');
@@ -311,6 +325,7 @@ export default function ProfileScreen() {
   const userId = user?.uniqueId ?? '';
 
   const [previewUri, setPreviewUri] = useState<string | null>(user?.avatarUrl ?? null);
+  const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const [isResettingAvatar, setIsResettingAvatar] = useState(false);
   const [successCounters, setSuccessCounters] = useState<Record<SuccessKey, number>>({
@@ -700,21 +715,25 @@ export default function ProfileScreen() {
   }, [logout, router, t]);
 
   const isResetDisabled = isResettingAvatar || (!user?.avatarUrl && !previewUri);
+  const activeAvatarUri = previewUri ?? user?.avatarUrl ?? null;
+  const entryAnim = useEntryAnimation();
+  const { colors } = useAppTheme();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.select({ ios: 0, android: 0 }) ?? 0}
       >
         <ScrollView
-          style={{ flex: 1, backgroundColor: 'white' }}
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 32, backgroundColor: 'white' }}
+          style={{ flex: 1, backgroundColor: colors.background }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 32, backgroundColor: colors.background }}
           keyboardShouldPersistTaps="handled"
         >
           <ScreenContainer>
             <YStack gap="$3" pb="$6">
+              <FadeInView index={0} enabled={entryAnim}>
               {/* Avatar */}
               <SectionCard
                 title={avatarTitle}
@@ -722,14 +741,20 @@ export default function ProfileScreen() {
                 successTrigger={successCounters.avatar}
               >
                 <YStack ai="center" gap="$3">
-                  <UserAvatar
-                    uri={previewUri ?? undefined}
-                    label={displayName.slice(0, 1).toUpperCase()}
-                    size={96}
-                    textSize={34}
-                  />
-                  <Text fontSize={12} color="$gray10">
-                    {avatarHint}
+                  <Pressable
+                    onPress={() => activeAvatarUri && setAvatarViewerOpen(true)}
+                    disabled={!activeAvatarUri}
+                    style={({ pressed }) => ({ opacity: activeAvatarUri && pressed ? 0.85 : 1 })}
+                  >
+                    <UserAvatar
+                      uri={previewUri ?? undefined}
+                      label={displayName.slice(0, 1).toUpperCase()}
+                      size={96}
+                      textSize={34}
+                    />
+                  </Pressable>
+                  <Text fontSize={12} color="$gray10" ta="center">
+                    {activeAvatarUri ? avatarViewHint : avatarHint}
                   </Text>
                   <XStack gap="$2" w="100%">
                     <Button
@@ -756,7 +781,72 @@ export default function ProfileScreen() {
                   </XStack>
                 </YStack>
               </SectionCard>
+              </FadeInView>
 
+              <FadeInView index={1} enabled={entryAnim}>
+              {/* Appearance */}
+              <SectionCard
+                title={t('settings.theme.title', 'Appearance')}
+                icon={<Palette size={18} color="$gray11" />}
+              >
+                <YStack gap="$2.5">
+                  <Text fontSize={12} color="$gray9">
+                    {t('settings.theme.description', 'Choose how the app looks on your device.')}
+                  </Text>
+                  <ThemeModeSegmentedControl
+                    value={themeMode}
+                    onChange={(mode: ThemeMode) => {
+                      if (mode !== themeMode) void tapLight();
+                      setThemeMode(mode);
+                    }}
+                    getLabel={(key, fallback) => t(key, fallback)}
+                  />
+                  <XStack ai="center" jc="space-between" pt="$1">
+                    <YStack f={1} pr="$3" gap="$1">
+                      <Text fontSize={14} fontWeight="600">
+                        {t('settings.colorblind.title', 'Colorblind-friendly')}
+                      </Text>
+                      <Text fontSize={12} color="$gray9">
+                        {t(
+                          'settings.colorblind.description',
+                          'Uses blue and amber instead of green and red.'
+                        )}
+                      </Text>
+                    </YStack>
+                    <AppButton
+                      title={colorblind ? t('common.on', 'On') : t('common.off', 'Off')}
+                      variant={colorblind ? 'primary' : 'outline'}
+                      size="small"
+                      onPress={() => {
+                        void tapLight();
+                        setColorblind(!colorblind);
+                      }}
+                    />
+                  </XStack>
+
+                  <YStack gap="$1.5" pt="$1">
+                    <Text fontSize={14} fontWeight="600">
+                      {t('settings.currency.title', 'Default currency')}
+                    </Text>
+                    <Text fontSize={12} color="$gray9">
+                      {t(
+                        'settings.currency.description',
+                        'Used for new receipts when the currency is unclear.'
+                      )}
+                    </Text>
+                    <CurrencySegmentedControl
+                      value={defaultCurrency}
+                      onChange={(code: CurrencyCode) => {
+                        if (code !== defaultCurrency) void tapLight();
+                        setDefaultCurrency(code);
+                      }}
+                    />
+                  </YStack>
+                </YStack>
+              </SectionCard>
+              </FadeInView>
+
+              <FadeInView index={2} enabled={entryAnim}>
               {/* Language */}
               <SectionCard
                 title={t('settings.language.title', 'Language')}
@@ -769,13 +859,17 @@ export default function ProfileScreen() {
 
                   <LanguageSegmentedControl
                     value={language}
-                    onChange={(code) => setLanguage(code)}
+                    onChange={(code) => {
+                      if (code !== language) void tapLight();
+                      setLanguage(code);
+                    }}
                     getLabel={(code, fallback) => t(`settings.language.options.${code}`, fallback)}
                   />
                 </YStack>
               </SectionCard>
+              </FadeInView>
 
-
+              <FadeInView index={3} enabled={entryAnim}>
               {/* User info */}
               <SectionCard title={userInfoTitle} icon={<UserIcon size={18} color="$gray11" />}>
                 <EditableFieldRow
@@ -823,7 +917,9 @@ export default function ProfileScreen() {
                   onCopy={() => handleCopy(userIdLabel, userId)}
                 />
               </SectionCard>
+              </FadeInView>
 
+              <FadeInView index={4} enabled={entryAnim}>
               {/* Password */}
               <SectionCard
                 title={passwordTitle}
@@ -867,7 +963,9 @@ export default function ProfileScreen() {
                   </Button>
                 </YStack>
               </SectionCard>
+              </FadeInView>
 
+              <FadeInView index={5} enabled={entryAnim}>
               {/* Logout */}
               <Button
                 size="$3"
@@ -880,10 +978,45 @@ export default function ProfileScreen() {
               >
                 {logoutLabel}
               </Button>
+              </FadeInView>
             </YStack>
           </ScreenContainer>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={avatarViewerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarViewerOpen(false)}
+      >
+        <Pressable
+          style={avatarViewerStyles.backdrop}
+          onPress={() => setAvatarViewerOpen(false)}
+        >
+          {activeAvatarUri ? (
+            <Image
+              source={{ uri: activeAvatarUri }}
+              style={avatarViewerStyles.image}
+              resizeMode="contain"
+            />
+          ) : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const avatarViewerStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  image: {
+    width: '100%',
+    height: '70%',
+  },
+});

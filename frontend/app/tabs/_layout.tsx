@@ -5,15 +5,19 @@ import { Tabs, useRouter } from 'expo-router';
 import { Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { YStack, XStack, Text, View } from 'tamagui';
-import { Home, Settings, Bell, ChevronLeft } from '@tamagui/lucide-icons';
+import { Home, Settings, Bell, ChevronLeft, Zap } from '@tamagui/lucide-icons';
 import { useTranslation } from 'react-i18next';
 
 import { useAppStore } from '@/shared/lib/stores/app-store';
 import UserAvatar from '@/shared/ui/UserAvatar';
+import { useAppColors } from '@/shared/ui/theme-context';
 import { useFriendsStore } from '@/features/friends/model/friends.store';
+import { useReceiptSessionStore } from '@/features/receipt/model/receipt-session.store';
+import { openQuickHabits } from '@/features/receipt/model/quick-habits-ui.store';
 
 // --- Reusable Badge Component ---
 function DotBadge({ value }: { value?: number }) {
+  const colors = useAppColors();
   if (!value || value <= 0) return null;
   return (
     <View
@@ -22,7 +26,7 @@ function DotBadge({ value }: { value?: number }) {
       w={20} h={20}
       br={999}
       ai="center" jc="center"
-      backgroundColor="#2ECC71"
+      backgroundColor={colors.primary}
     >
       <Text color="white" fontSize={10} fontWeight="700">
         {value}
@@ -53,36 +57,45 @@ function GlobalTabsHeader(props: any) {
   const onBackToHome = () => router.replace({ pathname: '/tabs' });
 
   const requestsCount = useFriendsStore((s) => s.requestsRaw?.incoming?.length ?? 0);
+  const sessionItems = useReceiptSessionStore((s) => s.items);
+  const showHabitsShortcut =
+    routeName.startsWith('sessions') && sessionItems.length > 0;
   const displayName = user?.username || t('profile.labels.guest', 'Guest');
   const userInitial = displayName.slice(0, 1).toUpperCase();
 
+  const colors = useAppColors();
   const handleOpenProfile = useCallback(() => {
     router.push({ pathname: '/tabs/profile' });
   }, [router]);
 
   return (
-    <YStack bg="$background" pt={insets.top}>
+    <YStack bg={colors.background} pt={insets.top} borderBottomWidth={1} borderBottomColor={colors.border}>
       <XStack h={50} ai="center" jc="space-between" px="$4">
         <XStack ai="center" gap="$2">
           {showHomeShortcut && (
             <Pressable onPress={onBackToHome} hitSlop={10}>
               <XStack ai="center" gap="$1">
-                <ChevronLeft size={20} color="$gray11" />
-                <Text fontSize={14} color="$gray11">
+                <ChevronLeft size={20} color={colors.textMuted} />
+                <Text fontSize={14} color={colors.textMuted}>
                   {t('navigation.mainMenu', 'Main menu')}
                 </Text>
               </XStack>
             </Pressable>
           )}
-          <Text fontSize={18} fontWeight="600" numberOfLines={1} miw={150}>
+          <Text fontSize={18} fontWeight="700" color={colors.text} numberOfLines={1} miw={150}>
             {props.options.title}
           </Text>
         </XStack>
 
         <XStack ai="center" gap="$3">
+          {showHabitsShortcut && (
+            <Pressable onPress={() => openQuickHabits('suggestions')} hitSlop={10}>
+              <Zap size={22} color={colors.primary} />
+            </Pressable>
+          )}
           <Pressable onPress={() => router.push('/tabs/friends/requests')}>
             <View>
-              <Bell size={22} color="$gray11" />
+              <Bell size={22} color={colors.textMuted} />
               <DotBadge value={requestsCount} />
             </View>
           </Pressable>
