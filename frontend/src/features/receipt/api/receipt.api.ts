@@ -1,4 +1,5 @@
 import { apiClient } from '@/features/auth/api';
+import axios from 'axios';
 
 export type ReceiptImagePayload = {
   mimeType: string;
@@ -101,6 +102,14 @@ export interface FinalizeReceiptResponse {
 }
 
 const normalizeError = (error: unknown): Error => {
+  if (axios.isAxiosError(error)) {
+    const serverMessage = error.response?.data?.error;
+    if (typeof serverMessage === 'string' && serverMessage.trim()) {
+      return new Error(serverMessage);
+    }
+    if (!error.response) return new Error('Network error. Check your connection and try again.');
+    return new Error('The request could not be completed. Please try again.');
+  }
   if (error instanceof Error) return error;
   return new Error('Unexpected error');
 };
@@ -108,30 +117,18 @@ const normalizeError = (error: unknown): Error => {
 export const ReceiptApi = {
   async parse(payload: ParseReceiptRequest): Promise<ParseReceiptResponse> {
     try {
-      // console.log('[API] POST /sessions/scan');
-      // console.log('[API] Request data:', JSON.stringify(payload, null, 2));
-
       const { data } = await apiClient.post<ParseReceiptResponse>('/sessions/scan', payload);
-
-      console.log('[API] Response:', JSON.stringify(data, null, 2));
       return data;
     } catch (error) {
-      console.error('[API] Error (parse):', error);
       throw normalizeError(error);
     }
   },
 
   async finalize(payload: FinalizeReceiptRequest): Promise<FinalizeReceiptResponse> {
     try {
-      console.log('[API] POST /sessions/finalize');
-      console.log('[API] Request data:', JSON.stringify(payload, null, 2));
-
       const { data } = await apiClient.post<FinalizeReceiptResponse>('/sessions/finalize', payload);
-
-      console.log('[API] Response:', JSON.stringify(data, null, 2));
       return data;
     } catch (error) {
-      console.error('[API] Error (finalize):', error);
       throw normalizeError(error);
     }
   },

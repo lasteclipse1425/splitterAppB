@@ -15,6 +15,7 @@ import { useAppStore } from '@/shared/lib/stores/app-store';
 import { changePassword, resetAvatar, updateEmail, updateUsername, uploadAvatar } from '@/features/auth/api';
 import { LANGUAGE_OPTIONS, type LanguageCode } from '@/shared/config/languages';
 import { LanguageSegmentedControl } from '@/shared/ui/LanguageSegmentedControl';
+import { CURRENCY_OPTIONS } from '@/shared/config/currencies';
 
 type SuccessKey = 'avatar' | 'password';
 type StatusState = 'idle' | 'saving' | 'success';
@@ -268,7 +269,7 @@ function EditableFieldRow({
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout, setUser } = useAppStore();
+  const { user, logout, setUser, theme, setTheme, preferredCurrency, setPreferredCurrency } = useAppStore();
 
   // language from store
   const language = useAppStore((s) => s.language);
@@ -700,17 +701,18 @@ export default function ProfileScreen() {
   }, [logout, router, t]);
 
   const isResetDisabled = isResettingAvatar || (!user?.avatarUrl && !previewUri);
+  const screenBackground = theme === 'dark' ? '#111827' : '#FFFFFF';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: screenBackground }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.select({ ios: 0, android: 0 }) ?? 0}
       >
         <ScrollView
-          style={{ flex: 1, backgroundColor: 'white' }}
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 32, backgroundColor: 'white' }}
+        style={{ flex: 1, backgroundColor: screenBackground }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 32, backgroundColor: screenBackground }}
           keyboardShouldPersistTaps="handled"
         >
           <ScreenContainer>
@@ -773,6 +775,59 @@ export default function ProfileScreen() {
                     getLabel={(code, fallback) => t(`settings.language.options.${code}`, fallback)}
                   />
                 </YStack>
+              </SectionCard>
+
+              {/* Appearance */}
+              <SectionCard
+                title={t('settings.theme.title', 'Appearance')}
+                icon={<Text fontSize={18}>{theme === 'dark' ? '🌙' : '☀️'}</Text>}
+              >
+                <Text fontSize={12} color="$gray9">
+                  {t('settings.theme.description', 'Choose a light or dark appearance.')}
+                </Text>
+                <XStack gap="$2">
+                  {(['light', 'dark'] as const).map((option) => {
+                    const active = theme === option;
+                    return (
+                      <Button
+                        key={option}
+                        flex={1}
+                        size="$3"
+                        bg={active ? '$green9' : '$color2'}
+                        color={active ? 'white' : '$color'}
+                        onPress={() => setTheme(option)}
+                      >
+                        {t(`settings.theme.${option}`, option === 'light' ? 'Light' : 'Dark')}
+                      </Button>
+                    );
+                  })}
+                </XStack>
+              </SectionCard>
+
+              {/* Default currency */}
+              <SectionCard
+                title={t('settings.currency.title', 'Default currency')}
+                icon={<Text fontSize={18}>¤</Text>}
+              >
+                <Text fontSize={12} color="$gray9">
+                  {t('settings.currency.description', 'Used when receipt currency is unknown. Amounts are not converted.')}
+                </Text>
+                <XStack gap="$2" flexWrap="wrap">
+                  {CURRENCY_OPTIONS.map((option) => {
+                    const active = preferredCurrency === option.code;
+                    return (
+                      <Button
+                        key={option.code}
+                        size="$2"
+                        bg={active ? '$green9' : '$color2'}
+                        color={active ? 'white' : '$color'}
+                        onPress={() => setPreferredCurrency(option.code)}
+                      >
+                        {option.code} · {option.symbol}
+                      </Button>
+                    );
+                  })}
+                </XStack>
               </SectionCard>
 
 

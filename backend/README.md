@@ -48,6 +48,12 @@ npm run dev
 
 Make sure `DATABASE_URL` in `.env` points at your SQLite file (see `.env.example`).
 
+### Avatar storage
+
+When R2 is not configured, local development stores avatars under `backend/data/avatars` and serves them from `/media/avatars/...`. Docker Compose enables the same local mode and stores files under `/app/data/avatars` in the persistent `/app/data` volume. The avatar directory is excluded from Git.
+
+For a production host without persistent local storage, configure Cloudflare R2 with `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, and `CDN_BASE_URL`. Do not enable local avatar storage on an ephemeral production filesystem.
+
 ## Useful commands
 
 ```bash
@@ -58,3 +64,13 @@ npm run db:migrate
 npm run db:deploy
 npm run db:studio
 ```
+
+### Add random local demo friends
+
+This creates synthetic users and accepted friendships in a local SQLite database only. Find your account's `uniqueId` in the profile screen, then run:
+
+```bash
+npm run friends:add-random -- --target "USER#1234" --count 5
+```
+
+The count is optional (defaults to 5; maximum 50). This command refuses to run when `DATABASE_URL` is not a local SQLite file.

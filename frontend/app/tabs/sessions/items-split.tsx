@@ -13,6 +13,7 @@ import { ReceiptApi } from '@/features/receipt/api/receipt.api';
 import type { FinalizeReceiptItemPayload, FinalizeTotalsByItem, FinalizeTotalsByParticipant, ReceiptAllocation } from '@/features/receipt/api/receipt.api';
 import { useSessionsHistoryStore } from '@/features/sessions/model/history.store';
 import { useQuickHabitsStore } from '@/features/receipt/model/quick-habits.store';
+import { CURRENCY_OPTIONS, formatCurrencyAmount } from '@/shared/config/currencies';
 
 // ===== Types =====
 type Participant = { uniqueId: string; username: string };
@@ -259,6 +260,7 @@ export default function ItemsSplitScreen() {
   const storeParticipants = useReceiptSessionStore((s) => s.participants);
   const setStoreItems = useReceiptSessionStore((s) => s.setItems);
   const setLastFinishPayload = useReceiptSessionStore((s) => s.setLastFinishPayload);
+  const setStoreCurrency = useReceiptSessionStore((s) => s.setCurrency);
 
   const fetchHistory = useSessionsHistoryStore((s) => s.fetchHistory);
   const historyInitialized = useSessionsHistoryStore((s) => s.initialized);
@@ -285,14 +287,13 @@ export default function ItemsSplitScreen() {
 
   const fmtCurrency = useCallback((n: number) => {
     const currency = storeCurrency || 'UZS';
-    return `${currency} ${Math.round(n).toLocaleString('en-US')}`;
+    return `${currency} ${formatCurrencyAmount(n, currency)}`;
   }, [storeCurrency]);
 
   const getCurrencyParts = useCallback((n: number) => {
-    const formatted = fmtCurrency(n);
-    const [currency, ...rest] = formatted.split(' ');
-    return { currency, amount: rest.join(' ') || '0' };
-  }, [fmtCurrency]);
+    const currency = storeCurrency || 'UZS';
+    return { currency, amount: formatCurrencyAmount(n, currency) };
+  }, [storeCurrency]);
 
   const [items, setLocalItems] = useState<Item[]>([]);
 
@@ -1081,6 +1082,36 @@ export default function ItemsSplitScreen() {
                     </Text>
                   </XStack>
                 ))}
+              </XStack>
+            </ScrollView>
+          </YStack>
+
+          {/* Bill currency */}
+          <YStack gap="$2">
+            <Text fontSize={13} fontWeight="700">Bill currency</Text>
+            <Text fontSize={11} color="$gray10">Changes the currency label only; amounts are not converted.</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <XStack gap="$2" pr="$4">
+                {CURRENCY_OPTIONS.map((option) => {
+                  const active = storeCurrency === option.code;
+                  return (
+                    <Button
+                      key={option.code}
+                      unstyled
+                      onPress={() => setStoreCurrency(option.code)}
+                      px="$3"
+                      py="$2"
+                      borderRadius={18}
+                      borderWidth={1}
+                      borderColor={active ? '#2ECC71' : '$gray6'}
+                      bg={active ? '#2ECC71' : '$color1'}
+                    >
+                      <Text fontSize={12} fontWeight="700" color={active ? 'white' : '$gray11'}>
+                        {option.code} · {option.symbol}
+                      </Text>
+                    </Button>
+                  );
+                })}
               </XStack>
             </ScrollView>
           </YStack>

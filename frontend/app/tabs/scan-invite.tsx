@@ -4,11 +4,13 @@ import { ActivityIndicator, StyleSheet, View, Image, Animated, Modal } from 'rea
 import { useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { YStack, XStack, Button, Paragraph } from 'tamagui';
+import { useTranslation } from 'react-i18next';
+import { YStack, XStack, Button, Paragraph, Input } from 'tamagui';
 import { ChevronLeft } from '@tamagui/lucide-icons';
 
 import { parseInviteFromScan } from '@/shared/lib/utils/invite';
 import { FriendsApi } from '@/features/friends/api/friends.api';
+import { useFriendsStore } from '@/features/friends/model/friends.store';
 import { GroupsApi } from '@/features/groups/api/groups.api';
 
 type FromParam = 'friends-requests' | 'groups-index' | undefined;
@@ -23,10 +25,14 @@ interface UserData {
 export default function ScanInviteScreen() {
   const [perm, requestPerm] = useCameraPermissions();
   const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [manualLink, setManualLink] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [userData, setUserData] = useState<UserData | null>(null);
   const lock = useRef(false);
   const isFocused = useIsFocused();
   const router = useRouter();
+  const { t } = useTranslation();
+  const refreshFriends = useFriendsStore((s) => s.fetchAll);
   const { from } = useLocalSearchParams<{ from?: FromParam }>();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,9 +74,12 @@ export default function ScanInviteScreen() {
   };
 
   async function redeem(data: string) {
+    if (lock.current) return;
+    lock.current = true;
     try {
+      setErrorMessage('');
       const parsed = parseInviteFromScan(data);
-      if (!parsed) throw new Error('not-our-qr');
+      if (!parsed) throw new Error('This link is not a valid friend or group invite.');
 
       setStatus('loading');
       
@@ -81,6 +90,13 @@ export default function ScanInviteScreen() {
 
       // API helpers already return response.data (not axios response object).
       const payload = (response ?? {}) as Record<string, any>;
+      if (parsed.kind === 'friend' && payload.action === 'self') {
+        throw new Error('You cannot add yourself as a friend.');
+      }
+      if (parsed.kind === 'friend') {
+        await refreshFriends();
+      }
+
       const userLike =
         payload.user ??
         payload.inviter ??
@@ -111,14 +127,32 @@ export default function ScanInviteScreen() {
 
       setStatus('ok');
       setTimeout(goBack, 3000);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not use this invite.';
+      const friendlyMessage = /invalid or expired token/i.test(message)
+        ? t('friends.invite.expired', 'This invite link has expired. Ask your friend to create a new QR code or link.')
+        : /invalid token|token is required/i.test(message)
+          ? t('friends.invite.invalid', 'This invite link is invalid. Check the link and try again.')
+          : message;
+      setErrorMessage(friendlyMessage);
       setStatus('error');
       setTimeout(() => {
         setStatus('idle');
         lock.current = false;
-      }, 900);
+      }, 1800);
     }
   }
+
+  const submitManualLink = () => {
+    const link = manualLink.trim();
+    if (!link) {
+      setErrorMessage('Paste or enter an invite link first.');
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 1800);
+      return;
+    }
+    void redeem(link);
+  };
 
   return (
     <View style={S.root}>
@@ -146,8 +180,7 @@ export default function ScanInviteScreen() {
             barcodeScannerSettings={{ barcodeTypes: ['qr'] as const }}
             onBarcodeScanned={(res) => {
               if (lock.current || status === 'loading') return;
-              lock.current = true;
-              redeem(res.data);
+              void redeem(res.data);
             }}
           />
         ) : (
@@ -157,18 +190,39 @@ export default function ScanInviteScreen() {
         )}
       </View>
 
+      {status !== 'ok' && status !== 'loading' && (
+        <YStack position="absolute" left={16} right={16} bottom={28} gap="$2" p="$3" br={14} bg="rgba(0,0,0,0.82)">
+          <Paragraph col="white" fos={13}>Or paste an invite link</Paragraph>
+          <Input
+            value={manualLink}
+            onChangeText={(value) => {
+              setManualLink(value);
+              setErrorMessage('');
+            }}
+            placeholder="https://.../friends/join?token=..."
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            returnKeyType="go"
+            onSubmitEditing={submitManualLink}
+            bg="white"
+            color="#1A1A1A"
+            borderRadius={10}
+            accessibilityLabel="Invite link"
+          />
+          {!!errorMessage && <Paragraph color="$red10">{errorMessage}</Paragraph>}
+          <Button onPress={submitManualLink} theme="active" borderRadius={10}>
+            Use invite link
+          </Button>
+        </YStack>
+      )}
+
       {status === 'loading' && (
         <View style={S.overlay}>
           <YStack ai="center" gap="$2">
             <ActivityIndicator color="white" />
             <Paragraph col="white">ConnectingвЂ¦</Paragraph>
           </YStack>
-        </View>
-      )}
-
-      {status === 'error' && (
-        <View style={S.overlay}>
-          <Paragraph col="white">Error рџ•</Paragraph>
         </View>
       )}
 

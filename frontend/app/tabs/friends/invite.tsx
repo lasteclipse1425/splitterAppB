@@ -22,7 +22,7 @@ export default function FriendInviteScreen() {
   async function refresh() {
     setLoading(true);
     try {
-      const resp = await FriendsApi.createInvite(300);
+      const resp = await FriendsApi.createInvite(3600);
       setData({ url: resp.url, expiresAt: resp.expiresAt });
     } finally {
       setLoading(false);

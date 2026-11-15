@@ -44,7 +44,12 @@ app.use("/auth", authRoutes);
 app.use("/friends", friendsRoutes);
 app.use("/groups", groupsRoutes);
 app.use("/sessions", sessionsRoutes);
+app.use("/uploads", uploadsRoutes);
 ```
+
+The `/sessions/scan` route parses receipt photos before it creates a session. Failed OCR returns an error instead of a sample receipt. The `/friends/invite` and `/friends/join` routes issue and redeem short-lived signed invite tokens.
+
+Avatar uploads use Cloudflare R2 when configured. Local development and Docker Compose can use the persistent avatar directory (`data/avatars` or `/app/data/avatars`), served under `/media/avatars`. Docker's `/app/data` volume holds both SQLite data and local avatars; only the avatar subdirectory is public.
 
 Health check:
 
@@ -98,6 +103,8 @@ Important files:
 - `frontend/src/features/auth/api/index.ts` - shared Axios client
 - `frontend/src/shared/config/env.ts` - frontend env validation and API URL
 - `frontend/src/shared/ui/` - reusable UI components
+- `frontend/src/shared/config/currencies.ts` - supported currencies and currency-aware number formatting
+- `frontend/src/shared/lib/stores/app-store.tsx` - persisted theme, language, and preferred currency
 - `frontend/app.json` - Expo configuration
 - `frontend/metro.config.js` - Metro resolver workarounds
 - `frontend/babel.config.js` - Babel plugins
@@ -135,6 +142,8 @@ http://localhost:8080
 `backend/docker-compose.yml` starts the backend service with a persistent SQLite volume.
 
 On startup it applies Prisma migrations and starts Express.
+
+Docker Compose also persists local avatar files in `/app/data/avatars`. The app uses the dark/light theme selected in the profile screen. Receipt currency may be changed per bill; no exchange-rate conversion is performed.
 
 Default local port:
 

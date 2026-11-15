@@ -98,28 +98,41 @@ router.post(
       if (
         !image ||
         typeof image !== "object" ||
-        !image.mimeType ||
-        !image.data
+        typeof image.mimeType !== "string" ||
+        !/^image\/(jpeg|png|webp)$/i.test(image.mimeType) ||
+        typeof image.data !== "string" ||
+        image.data.length === 0 ||
+        image.data.length > 16 * 1024 * 1024
       ) {
         return res
           .status(400)
-          .json({ error: "image { mimeType, data } required" });
+          .json({ error: "A valid JPEG, PNG, or WebP image is required" });
       }
 
-      // Create session (name field exists in schema but older DB may lack column; ignore until migration applied)
+      let parseResult;
+      try {
+        parseResult = await parseReceipt({
+          language,
+          sessionName,
+          mimeType: image.mimeType,
+          imageBase64: image.data,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Receipt parsing failed";
+        return res.status(422).json({ error: message });
+      }
+
+      if (parseResult.items.length === 0) {
+        return res.status(422).json({ error: "No items could be read from this receipt" });
+      }
+
+      // Only persist a session after OCR has produced usable receipt data.
       const session = await prisma.session.create({
         data: {
           creatorId: req.user.id,
           status: "ACTIVE",
         },
         select: { id: true },
-      });
-
-      const parseResult = await parseReceipt({
-        language,
-        sessionName,
-        mimeType: image.mimeType,
-        imageBase64: image.data,
       });
 
       return res.json({

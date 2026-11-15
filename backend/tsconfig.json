@@ -47,6 +47,7 @@
     "experimentalSpecifierResolution": "node"
   },
   "exclude": [
+    "dist",
     "link_everyone.ts",
     "seed_mock_users.ts",
     "*.ts"

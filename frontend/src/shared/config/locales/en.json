@@ -55,6 +55,10 @@
     "remove": "Remove",
     "loading": "Loading...",
     "error": "Failed to load",
+    "invite": {
+      "expired": "This invite link has expired. Ask your friend to create a new QR code or link.",
+      "invalid": "This invite link is invalid. Check the link and try again."
+    },
     "common": {
       "unknownUser": "Unknown user",
       "error": "Something went wrong"
@@ -222,6 +226,17 @@
     "fallbackName": "Bill"
   },
   "settings": {
+    "profile": { "edit": "Edit profile details and photo" },
+    "theme": {
+      "title": "Appearance",
+      "description": "Choose a light or dark appearance.",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "currency": {
+      "title": "Default currency",
+      "description": "Used when receipt currency is unknown. You can change it for each bill. Amounts are not converted."
+    },
     "language": {
       "title": "Language",
       "description": "Choose the language used across the app.",

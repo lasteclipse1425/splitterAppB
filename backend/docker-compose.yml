@@ -16,6 +16,8 @@ services:
       JWT_SECRET: student_dev_jwt_secret_change_me
       ALLOW_ALL_CORS: 1
       JSON_BODY_LIMIT: 4mb
+      AVATAR_STORAGE_MODE: local
+      AVATAR_STORAGE_DIR: /app/data/avatars
       # НАША ДОБАВКА 2: Открываем бэкенд для внешней сети (вашего телефона)
       HOST: 0.0.0.0
     volumes:

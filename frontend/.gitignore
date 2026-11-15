@@ -51,3 +51,6 @@ local.properties
 
 # Tamagui
 .tamagui/
+
+# Generated short-lived friend QR invite tokens; do not publish these in the repository.
+assets/friend-invites/*.png

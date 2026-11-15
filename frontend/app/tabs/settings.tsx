@@ -4,6 +4,7 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
 import { YStack, Text, Separator, XStack } from 'tamagui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 
 import { Button } from '@/shared/ui/Button';
 import { ScreenContainer } from '@/shared/ui/ScreenContainer';
@@ -12,10 +13,12 @@ import PasswordInput from '@/shared/ui/PasswordInput';
 import { useAppStore } from '@/shared/lib/stores/app-store';
 import { changePassword, updateUsername } from '@/features/auth/api';
 import { LANGUAGE_OPTIONS, type LanguageCode } from '@/shared/config/languages';
+import { CURRENCY_OPTIONS } from '@/shared/config/currencies';
 
 export default function SettingsScreen() {
-  const { user, setUser, language, setLanguage } = useAppStore();
+  const { user, setUser, language, setLanguage, theme, setTheme, preferredCurrency, setPreferredCurrency } = useAppStore();
   const { t } = useTranslation();
+  const router = useRouter();
   const isLoggedIn = !!user;
 
   const [usernameValue, setUsernameValue] = useState(user?.username ?? '');
@@ -156,6 +159,53 @@ export default function SettingsScreen() {
                 <Text color="$gray10">
                   Update your username and password using the forms below.
                 </Text>
+                <Button
+                  title={t('settings.profile.edit', 'Edit profile details and photo')}
+                  variant="outline"
+                  size="medium"
+                  onPress={() => router.push('/tabs/profile' as never)}
+                />
+              </YStack>
+
+              <Separator />
+
+              {/* THEME */}
+              <YStack space="$3">
+                <Text fontSize={16} fontWeight="600">{t('settings.theme.title', 'Appearance')}</Text>
+                <Text fontSize={14} color="$gray10">{t('settings.theme.description', 'Choose a light or dark appearance.')}</Text>
+                <XStack space="$2">
+                  <Button
+                    title={t('settings.theme.light', 'Light')}
+                    variant={theme === 'light' ? 'primary' : 'outline'}
+                    size="small"
+                    onPress={() => setTheme('light')}
+                  />
+                  <Button
+                    title={t('settings.theme.dark', 'Dark')}
+                    variant={theme === 'dark' ? 'primary' : 'outline'}
+                    size="small"
+                    onPress={() => setTheme('dark')}
+                  />
+                </XStack>
+              </YStack>
+
+              <Separator />
+
+              {/* CURRENCY */}
+              <YStack space="$3">
+                <Text fontSize={16} fontWeight="600">{t('settings.currency.title', 'Default currency')}</Text>
+                <Text fontSize={14} color="$gray10">{t('settings.currency.description', 'Used when receipt currency is unknown. You can change it for each bill.')}</Text>
+                <XStack space="$2" flexWrap="wrap">
+                  {CURRENCY_OPTIONS.map((option) => (
+                    <Button
+                      key={option.code}
+                      title={`${option.code} · ${option.symbol}`}
+                      variant={preferredCurrency === option.code ? 'primary' : 'outline'}
+                      size="small"
+                      onPress={() => setPreferredCurrency(option.code)}
+                    />
+                  ))}
+                </XStack>
               </YStack>
 
               {/* LANGUAGE */}

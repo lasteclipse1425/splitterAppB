@@ -1,177 +1,57 @@
-# ARCHITECTURE.md — SPMS (Receipt Splitter — Frontend)
+# Frontend architecture
 
-## 1. Платформа и стек
+## Platform and stack
 
-* **Платформа:** React Native + Expo SDK 53 с поддержкой Expo Go.
-* **Языки:** TypeScript 5.8.3.
-* **Сборка и публикация:** EAS Build + OTA Updates.
-* **Навигация:** expo-router v5.1.4 (stack, tabs, modals), deep links.
-* **Стейт:** Zustand v5.0.7 (глобальный стейт) + React Query v5.85.3 (серверные данные, кэш, офлайн-режим).
-* **Формы и валидация:** React Hook Form v7.62.0 + Zod v4.0.17.
-* **Стилизация:** Собственная система стилей на основе StyleSheet, дизайн-токены, поддержка light/dark themes.
-* **Локализация:** react-i18next v15.6.1 + expo-localization v16.1.6, поддержка ja/en, конфигурация в `src/shared/config/i18n.ts`.
-* **Сеть:** Axios v1.11.0 с интерсепторами (auth, lang header, cancellation, retry).
-* **Тестирование:** Jest + React Native Testing Library; e2e (Detox или Maestro при необходимости).
+- React Native 0.81 with Expo SDK 54 and Expo Router 6.
+- TypeScript 5.9, Tamagui, React Query 5, Zustand 5, Axios, and i18next.
+- Supported interface languages: English, Japanese, and Uzbek.
+- Supported runtime: iOS and Android through Expo Go. Web is a preview target.
 
-## 2. Версии основных зависимостей (SDK 53)
+See `package.json` for the exact dependency versions.
 
-```json
-{
-  "expo": "~53.0.20",
-  "react": "19.0.0", 
-  "react-native": "0.79.5",
-  "expo-router": "~5.1.4",
-  "zustand": "^5.0.7",
-  "@tanstack/react-query": "^5.85.3",
-  "react-hook-form": "^7.62.0",
-  "zod": "^4.0.17",
-  "react-i18next": "^15.6.1",
-  "i18next": "^25.3.6",
-  "expo-localization": "^16.1.6",
-  "axios": "^1.11.0",
-  "expo-secure-store": "^14.2.3",
-  "typescript": "^5.8.3"
-}
+## App structure
+
+- `app/` contains Expo Router layouts and screens.
+- `src/features/` contains auth, friends, groups, receipt splitting, and history APIs and stores.
+- `src/shared/` contains reusable UI, app configuration, localization, utilities, and stores.
+- `src/application/providers/` wires Tamagui, React Query, Zustand-backed app settings, and i18n.
+
+Important files:
+
+- `app/tabs/scan-receipt.tsx` captures a receipt photo and starts OCR.
+- `app/tabs/sessions/participants.tsx` selects the people sharing a bill.
+- `app/tabs/sessions/items-split.tsx` assigns receipt items and quantities and lets the user set that bill's currency label.
+- `app/tabs/sessions/finish.tsx` shows the final amounts and allocations.
+- `app/tabs/scan-invite.tsx` scans friend/group QR codes or accepts a pasted invite URL.
+- `app/tabs/profile.tsx` edits the username, email, avatar, and password, and contains language, appearance, and currency preferences.
+- `src/features/receipt/model/receipt-session.store.ts` owns the current receipt, split, and finalization state.
+- `src/shared/lib/stores/app-store.tsx` persists the theme, language, and preferred currency in device storage.
+- `src/shared/config/currencies.ts` lists supported currency codes and formats amounts using each currency's minor-unit rules.
+
+## Receipt and split flow
+
+The user photographs a paper receipt. The frontend sends its compressed image to `POST /sessions/scan`; the backend parses it before creating a session. OCR failures return an error and do not substitute mock receipt data. The user then selects participants, reviews and assigns items, and finalizes the allocation. OCR-detected currency is used when available; the user can change the currency label for the current bill.
+
+Currency selection changes the currency code and number formatting. It does not convert the underlying amounts or use exchange rates.
+
+## Friend invites
+
+The backend issues short-lived signed tokens from `POST /friends/invite`. Friend and group URLs are parsed by `src/shared/lib/utils/invite.ts`. The invite scanner supports both camera QR scanning and manual URL entry. After a friend invite is redeemed, the frontend refreshes the friend store and the friends screen reloads when focused.
+
+## Theme and profile
+
+The persisted `theme` setting is passed to the root Tamagui provider. The profile screen offers light/dark controls and uses theme-aware backgrounds. Profile editing uses the existing username, email, password, and avatar API endpoints.
+
+## Backend connection
+
+Set `EXPO_PUBLIC_API_URL` in `frontend/.env`. Use `http://YOUR_COMPUTER_IP:8080` on a phone running Expo Go; `localhost` on the phone refers to the phone itself.
+
+## Validation
+
+Run the frontend type check from the repository root with:
+
+```bash
+npm --prefix frontend run typecheck
 ```
 
-## 3. Архитектурный подход
-
-* **Feature-Sliced Design**:
-  * `src/app/` — конфигурация провайдеров (QueryClient, Zustand, i18n).
-  * `app/` — роутинг expo-router (layouts, screens).
-  * `src/features/*` — экраны и бизнес-логика конкретных функций.
-  * `src/entities/*` — модели, схемы валидации Zod, мапперы.
-  * `src/shared/*` — UI-компоненты, хуки, утилиты, темы, i18n.
-
-* **Структура папок**:
-```
-receipt-splitter-frontend/
-├── app/                           # Expo Router
-│   ├── (tabs)/                   # Tab навигация
-│   │   ├── index.tsx            # Home screen
-│   │   ├── explore.tsx          # Explore screen
-│   │   └── _layout.tsx          # Tabs layout
-│   └── _layout.tsx              # Root layout
-├── src/                          # Исходный код
-│   ├── app/                     # Конфигурация приложения
-│   │   ├── providers/           # Провайдеры (Query, Zustand)
-│   │   └── config/              # Конфигурации
-│   ├── features/                # Бизнес функции
-│   │   ├── auth/               # Авторизация
-│   │   ├── friends/           # Управление друзьями  
-│   │   ├── sessions/          # Сессии разделения счёта
-│   │   └── receipt/           # Работа с чеками и OCR
-│   ├── entities/              # Доменные модели
-│   │   ├── user/             # Пользователь
-│   │   ├── session/          # Сессия
-│   │   └── receipt/          # Чек
-│   └── shared/               # Переиспользуемые ресурсы
-│       ├── ui/              # UI Kit компоненты
-│       │   ├── theme.ts     # Цвета, размеры, типография
-│       │   └── styles.ts    # Базовые стили
-│       ├── lib/             # Хуки, утилиты
-│       │   ├── hooks/       # Переиспользуемые хуки
-│       │   └── utils/       # Утилиты
-│       ├── api/             # API клиенты
-│       └── config/          # Конфигурации (axios, react-query)
-├── assets/                   # Статические файлы
-├── DESCRIPTION.md           # Описание проекта
-├── ARCHITECTURE.md          # Архитектура (этот файл)
-├── ROADMAP.md              # Планы разработки
-├── RULES.md                # Правила разработки
-└── STATUS.yaml             # Текущий статус
-```
-
-* **Система стилизации**:
-  * Собственная система на основе React Native StyleSheet.
-  * Централизованные цвета, размеры и типография в `theme.ts`.
-  * Переиспользуемые стили в `commonStyles`.
-  * Поддержка светлой и тёмной темы.
-
-* **Слои данных**:
-  * API-клиенты (axios) по доменам (auth, friends, sessions, ocr).
-  * DTO ↔ Entity маппинг.
-  * Схемы валидации Zod с i18n поддержкой.
-
-## 4. Конфигурации
-
-### TypeScript (tsconfig.json):
-```json
-{
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "strict": true,
-    "skipLibCheck": true,
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"]
-    }
-  }
-}
-```
-
-### Babel (babel.config.js):
-```javascript
-module.exports = function (api) {
-  api.cache(true);
-  return {
-    presets: ['babel-preset-expo'],
-  };
-};
-```
-
-### Expo (app.json):
-```json
-{
-  "expo": {
-    "name": "Receipt Splitter",
-    "slug": "receipt-splitter",
-    "version": "1.0.0",
-    "plugins": ["expo-router"],
-    "experiments": {
-      "typedRoutes": true
-    }
-  }
-}
-```
-
-## 5. Интеграции
-
-* **Backend:** REST API (Node.js/Express или Python/FastAPI).
-* **OCR:** Google Vision API или Tesseract.
-* **Share:** React Native Share API.
-
-## 6. Безопасность
-
-* Хранение токенов в expo-secure-store v14.
-* Очистка данных при logout.
-* Минимизация хранения PII.
-* Проверка разрешений (камера, галерея) через expo-permissions.
-
-## 7. Производительность
-
-* Lazy-loading экранов через expo-router.
-* Оптимизация списков (FlatList / FlashList).
-* Мемоизация вычислений и компонентов.
-* Hermes engine с улучшенной поддержкой в SDK 53.
-* React Native новая архитектура (опционально).
-
-## 8. Разработка и CI/CD
-
-* **CI:** GitHub Actions — lint, test, build preview.
-* **CD:** EAS Build + Expo Publish (каналы preview/prod).
-* **Code style:** ESLint, Prettier, Husky, lint-staged, commitlint.
-
-## 9. Тестирование и контроль качества
-
-* Unit-тесты для утилит и хуков (Jest).
-* Компонентные тесты для UI (React Native Testing Library).
-* Snapshot-тесты для критичных экранов.
-* E2E-тесты ключевых сценариев (Detox или Maestro).
-
-## 10. Особенности реализации
-
-### Отказ от NativeWind:
-- Изначально планировалось использовать NativeWind для стилизации.
-- Из-за конфликтов с Babel и нестабильной работы в SDK 53, было принято решение использовать собственную систему стилей.
-- Это обеспечило стабильность сборки и полный контроль над ст
+Automated unit and UI test suites are not currently configured in this frontend package.

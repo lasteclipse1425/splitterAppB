@@ -1,4 +1,5 @@
 import express from "express";
+import path from "node:path";
 import dotenv from "dotenv";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
@@ -29,6 +30,10 @@ try {
 }
 
 const app = express();
+const avatarStorageDir = path.resolve(
+  process.env.AVATAR_STORAGE_DIR || path.join(process.cwd(), "data", "avatars")
+);
+app.use("/media/avatars", express.static(avatarStorageDir, { maxAge: "1y", immutable: true }));
 // Allow configurable JSON body size (large base64 images for /sessions/scan)
 // Default increased from Express ~100kb to 4mb to fit ~3MB binary image (base64 expands ~33%).
 const JSON_LIMIT = env.jsonBodyLimit;

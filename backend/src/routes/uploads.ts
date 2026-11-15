@@ -1,8 +1,11 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import multer from "multer";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { authenticateToken } from "../middleware/auth.js";
-import { uploadAvatarObject } from "../config/r2.js";
+import { isR2Configured, uploadAvatarObject } from "../config/r2.js";
 import { prisma } from "../config/prisma.js";
 
 type UploadFile = {
@@ -127,10 +130,35 @@ router.post(
       }
 
       // Build version from current timestamp seconds for simplicity
-      const v = Math.floor(Date.now() / 1000);
-      const key = `avatars/${req.user.id}/v${v}/avatar${ext}`;
+      const v = Date.now();
+      const fileName = `v${v}-${randomUUID()}${ext}`;
+      const key = `avatars/${req.user.id}/${fileName}`;
+      const storageMode = process.env.AVATAR_STORAGE_MODE;
+      const useLocalStorage =
+        storageMode === "local" ||
+        (storageMode !== "r2" && process.env.NODE_ENV !== "production" && !isR2Configured());
 
-      const put = await uploadAvatarObject(key, buffer, mimetype);
+      let put: { key: string; url: string };
+      if (useLocalStorage) {
+        const storageRoot = path.resolve(
+          process.env.AVATAR_STORAGE_DIR || path.join(process.cwd(), "data", "avatars")
+        );
+        const relativeFilePath = path.join(String(req.user.id), fileName);
+        const destination = path.join(storageRoot, relativeFilePath);
+        await mkdir(path.dirname(destination), { recursive: true });
+        await writeFile(destination, buffer);
+        const publicPath = relativeFilePath.split(path.sep).map(encodeURIComponent).join("/");
+        put = {
+          key,
+          url: `${req.protocol}://${req.get("host")}/media/avatars/${publicPath}`,
+        };
+      } else {
+        if (!isR2Configured()) {
+          res.status(503).json({ error: "Avatar storage is not configured on the server" });
+          return;
+        }
+        put = await uploadAvatarObject(key, buffer, mimetype);
+      }
 
       // Persist URL to user
       await prisma.user.update({

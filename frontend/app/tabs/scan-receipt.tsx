@@ -37,6 +37,7 @@ export default function ScanReceiptScreen() {
   const router = useRouter();
 
   const cameraRef = useRef<CameraView | null>(null);
+  const scanInFlightRef = useRef(false);
 
   const parsing = useReceiptSessionStore((s) => s.parsing);
   const parseReceipt = useReceiptSessionStore((s) => s.parseReceipt);
@@ -111,7 +112,8 @@ export default function ScanReceiptScreen() {
   useEffect(() => () => clearCapture(), [clearCapture]);
 
   const handleParse = useCallback(async () => {
-    if (!cameraRef.current || parsing) return;
+    if (!cameraRef.current || parsing || scanInFlightRef.current) return;
+    scanInFlightRef.current = true;
 
     try {
       setLocalError(null);
@@ -166,6 +168,8 @@ export default function ScanReceiptScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Something went wrong while sending the receipt';
       setLocalError(message);
+    } finally {
+      scanInFlightRef.current = false;
     }
   }, [cameraRef, parsing, sessionName, setSessionNameStore, setCapture, parseReceipt, language, router]);
 

@@ -31,6 +31,17 @@ npm run frontend:web
 
 Mobile through Expo Go is the main supported student workflow. Web mode is useful for preview, but can be less stable because this is a React Native app.
 
+## Main features
+
+- Photograph a paper receipt and review OCR items before splitting.
+- Split items equally or assign units to participants; review totals and past bills.
+- Add a friend by scanning a friend QR invite or pasting its URL in the invite scanner.
+- Open your profile from the avatar in the app header to edit username, email, avatar, and password. The profile also contains language, appearance, and default currency controls.
+- Choose light or dark appearance. The selection is saved on the device.
+- Select a default currency and override it for a particular bill. Supported codes: UZS, USD, EUR, RUB, GBP, JPY, KZT, CNY, TRY, AED, KRW, INR. Currency selection changes the label and number formatting; it does not convert amounts.
+
+Friend invite links are time-limited. If a link has expired, create a new QR from the Friend QR screen.
+
 ## API URL
 
 Create `frontend/.env` from `frontend/.env.example`.

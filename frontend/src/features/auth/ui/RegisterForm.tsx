@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRouter, Link } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type FieldErrors } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { YStack, XStack, Text } from 'tamagui';
@@ -23,9 +23,11 @@ const ACCOUNT_EXISTS_PATTERN =
   /(already exists|already registered|duplicate|taken|conflict|user exists|email exists|username exists)/i;
 
 const schema = z.object({
-  username: z.string(),
-  email: z.string(),
-  password: z.string(),
+  username: z.string().trim().min(1, 'Username is required').max(50, 'Username is too long'),
+  email: z.string().trim().email('Enter a valid email address'),
+  password: z.string().min(8, PASSWORD_POLICY_MESSAGE).regex(/[A-Z]/, PASSWORD_POLICY_MESSAGE)
+    .regex(/[a-z]/, PASSWORD_POLICY_MESSAGE).regex(/\d/, PASSWORD_POLICY_MESSAGE)
+    .regex(/[^A-Za-z0-9]/, PASSWORD_POLICY_MESSAGE),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -76,7 +78,11 @@ export default function RegisterForm() {
     try {
       setIsLoading(true);
       setNotice(null);
-      const res = await registerUser(values);
+      const res = await registerUser({
+        ...values,
+        username: values.username.trim(),
+        email: values.email.trim().toLowerCase(),
+      });
       await saveToken(res.token);
 
       let profile = res.user;
@@ -100,11 +106,11 @@ export default function RegisterForm() {
     }
   };
 
-  const onInvalid = () => {
+  const onInvalid = (fieldErrors: FieldErrors<FormData>) => {
     const firstMessage =
-      errors.username?.message ||
-      errors.email?.message ||
-      errors.password?.message ||
+      fieldErrors.username?.message ||
+      fieldErrors.email?.message ||
+      fieldErrors.password?.message ||
       t('auth.registerInvalid', 'Please check the form fields');
     showNotice('error', t('common.error', 'Error'), firstMessage);
   };

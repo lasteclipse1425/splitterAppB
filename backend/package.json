@@ -14,6 +14,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
+    "friends:add-random": "node --loader ts-node/esm -r dotenv/config add_random_friends.ts",
     "postinstall": "prisma generate"
   },
   "engines": {

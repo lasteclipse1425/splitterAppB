@@ -69,9 +69,11 @@ export function Input({
           borderRadius="$4"
           borderWidth={1}
           borderColor={error ? '$red8' : '$gray7'}
-          backgroundColor="$white1"
+          backgroundColor="#FFFFFF"
           height="$4"
           fontSize="$4"
+          color="#111827"
+          placeholderTextColor="#6B7280"
           focusStyle={{ borderColor: error ? '$red8' : '$green9' }}
           {...webIdentityProps}
           {...textInputProps}
@@ -85,7 +87,7 @@ export function Input({
             bottom={0}
             ai="center"
             jc="center"
-            pointerEvents="box-none"
+            style={{ pointerEvents: 'box-none' }}
           >
             {rightAdornment}
           </XStack>

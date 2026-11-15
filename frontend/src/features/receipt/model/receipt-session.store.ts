@@ -12,6 +12,7 @@ import type {
   ReceiptAllocation,
 } from '@/features/receipt/api/receipt.api';
 import { ReceiptApi } from '@/features/receipt/api/receipt.api';
+import { useAppStore } from '@/shared/lib/stores/app-store';
 
 export type CapturedReceiptImage = {
   uri?: string;
@@ -129,6 +130,9 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
     set({ parsing: true, parseError: undefined });
     try {
       const response = await ReceiptApi.parse(payload);
+      if (!Array.isArray(response.items) || response.items.length === 0) {
+        throw new Error('No items were found. Please retake the receipt photo.');
+      }
       const splitItems: ReceiptSplitItem[] = response.items.map((item) => ({
         id: item.id,
         name: item.name,
@@ -143,7 +147,10 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
       }));
 
       // ✅ Извлекаем валюту из ответа API
-      const detectedCurrency = response.summary?.currency || 'UZS';
+      const detectedCurrency =
+        response.summary?.currency && response.summary.currency !== 'UNKNOWN'
+          ? response.summary.currency
+          : useAppStore.getState().preferredCurrency;
 
       set({
         parsing: false,

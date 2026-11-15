@@ -53,6 +53,10 @@
     "remove": "O'chirish",
     "loading": "Yuklanmoqda...",
     "error": "Yuklab bo'lmadi",
+    "invite": {
+      "expired": "Bu taklif havolasining muddati tugagan. Do'stingizdan yangi QR kod yoki havola yaratishini so'rang.",
+      "invalid": "Bu taklif havolasi noto'g'ri. Havolani tekshirib, qayta urinib ko'ring."
+    },
     "common": {
       "unknownUser": "Noma'lum foydalanuvchi",
       "error": "Nimadir xato ketdi"
@@ -220,6 +224,17 @@
     "fallbackName": "Hisob"
   },
   "settings": {
+    "profile": { "edit": "Profil ma'lumotlari va rasmini tahrirlash" },
+    "theme": {
+      "title": "Ko'rinish",
+      "description": "Yorug' yoki qorong'i ko'rinishni tanlang.",
+      "light": "Yorug'",
+      "dark": "Qorong'i"
+    },
+    "currency": {
+      "title": "Standart valyuta",
+      "description": "Chek valyutasi aniqlanmasa ishlatiladi. Har bir hisob uchun o'zgartirish mumkin. Summalar konvertatsiya qilinmaydi."
+    },
     "language": {
       "title": "Til",
       "description": "Ilovada ishlatiladigan tilni tanlang.",

@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { YStack, XStack, Paragraph, Input, ScrollView, Spinner, Separator, Text } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { Search } from '@tamagui/lucide-icons';
@@ -14,9 +15,11 @@ export default function FriendsScreen() {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      void fetchAll();
+    }, [fetchAll]),
+  );
 
   const filteredFriends = useMemo(() => {
     if (!searchQuery) {

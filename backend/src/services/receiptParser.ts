@@ -18,7 +18,7 @@ export interface ParseResult {
   rawModelText?: string | undefined; // for debugging (only when DEBUG_PARSE=1)
   model?: string | undefined; // which model was used
   durationMs?: number | undefined;
-  source: "gemini" | "mock";
+  source: "gemini";
   usedModelVersion?: string | undefined;
   modelsTried?:
     | Array<{
@@ -184,12 +184,16 @@ function safeParseJson(text: string): { ok: boolean; data?: ParseResult } {
     if (!Array.isArray(raw.items) || !raw.summary) return { ok: false };
     // Basic normalization
     const items: ParsedReceiptItem[] = raw.items.map((it: any, idx: number) => {
-      const q = Number(it.quantity ?? 1) || 1;
-      const unit = Number(it.unitPrice ?? it.price ?? 0) || 0;
-      const total = Number(it.totalPrice ?? unit * q) || 0;
+      const q = Number(it.quantity ?? 1);
+      const unit = Number(it.unitPrice ?? it.price);
+      const total = Number(it.totalPrice ?? unit * q);
+      const name = typeof it.name === "string" ? it.name.trim() : "";
+      if (!name || !Number.isFinite(q) || q < 1 || !Number.isFinite(unit) || unit < 0 || !Number.isFinite(total) || total < 0) {
+        throw new Error(`Invalid receipt item at index ${idx}`);
+      }
       return {
         id: String(it.id ?? idx + 1),
-        name: String(it.name ?? "Item"),
+        name,
         unitPrice: round2(unit),
         quantity: q,
         totalPrice: round2(total),
@@ -230,50 +234,11 @@ function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-/** Fallback deterministic mock when API key missing or parse fails */
-function mockParse(): ParseResult {
-  const items: ParsedReceiptItem[] = [
-    {
-      id: "1001",
-      name: "Кола 0.5L",
-      unitPrice: 2.0,
-      quantity: 6,
-      totalPrice: 12.0,
-      confidence: 0.95,
-    },
-    {
-      id: "1002",
-      name: "Кола (стакан)",
-      unitPrice: 2.5,
-      quantity: 1,
-      totalPrice: 2.5,
-      confidence: 0.85,
-    },
-    {
-      id: "FEE1",
-      name: "Сервис",
-      unitPrice: 1.2,
-      quantity: 1,
-      totalPrice: 1.2,
-      kind: "fee",
-      confidence: 1.0,
-    },
-  ];
-  const grandTotal = items.reduce((s, i) => s + i.totalPrice, 0);
-  return {
-    items,
-    summary: { grandTotal, currency: "RUB", subtotal: 14.5, tax: 0, tip: 1.2 },
-    source: "mock",
-  };
-}
-
 export async function parseReceipt(
   options: ParseOptions
 ): Promise<ParseResult> {
   if (!GEMINI_API_KEY) {
-    if (DEBUG_PARSE)
-      console.warn("[parseReceipt] Using mock: GEMINI_API_KEY not set");
-    return mockParse();
+    throw new Error("Receipt scanning is unavailable: OCR API key is not configured.");
   }
 
   if (DEBUG_PARSE && !/^AIza[0-9A-Za-z_-]{10,}$/.test(GEMINI_API_KEY)) {
@@ -386,13 +351,8 @@ export async function parseReceipt(
     }
   }
   if (DEBUG_PARSE)
-    console.error(
-      "[parseReceipt] All model attempts failed, returning mock. Last error:",
-      lastError
-    );
-  const fallback = mockParse();
-  if (DEBUG_PARSE) fallback.modelsTried = modelsTried;
-  return fallback;
+    console.error("[parseReceipt] All model attempts failed:", lastError);
+  throw new Error("Could not read this receipt. Please take a clearer photo and try again.");
 }
 
 async function generateViaRest(

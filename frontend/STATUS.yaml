@@ -181,6 +181,43 @@ status_entries:
       ui_screens_updated: 1
       known_issues: 1
 
+  - status_id: "2026-11-15-21-30-receipt-splitter-refresh"
+    roadmap_ref: "chapter_04_sessions"
+    timestamp: "2026-11-15T21:30:00+05:00"
+    done:
+      - "Receipt OCR failures no longer fall back to sample bill data; sessions are persisted only after successful parsing."
+      - "Friend invite scanner accepts QR codes and pasted links, refreshes the friends list after redemption, and reports expired invites clearly."
+      - "Added 12 supported currency codes, default currency preference, per-bill currency selection, and currency-aware number formatting without exchange conversion."
+      - "Connected persisted light/dark theme to Tamagui and exposed appearance and currency controls from the profile screen."
+      - "Documented profile editing, friend invites, receipt splitting, currency behavior, and avatar storage."
+      - "Added local persistent avatar storage for development and Docker when Cloudflare R2 is not configured."
+    next:
+      - "Perform device-level checks for receipt scanning, invite redemption, profile editing, theme changes, and avatar uploads."
+      - "Configure Cloudflare R2 for production deployments that do not have persistent local storage."
+    evidence:
+      - "backend/src/services/receiptParser.ts"
+      - "backend/src/routes/sessions.ts"
+      - "backend/src/routes/uploads.ts"
+      - "frontend/app/tabs/scan-invite.tsx"
+      - "frontend/app/tabs/sessions/items-split.tsx"
+      - "frontend/app/tabs/profile.tsx"
+      - "frontend/src/shared/config/currencies.ts"
+      - "README.md"
+      - "ARCHITECTURE.md"
+    decisions:
+      - "Use persistent local avatar storage for development and Docker; require R2 or explicit persistent storage configuration in production."
+      - "Currency choices label and format amounts only; they do not perform foreign exchange."
+      - "Receipt photos use OCR; QR scanning is for friend and group invitations."
+    open_questions:
+      - "Which production host and R2 bucket should be configured for avatar storage?"
+    stack:
+      tech_stack: "Expo SDK 54, React Native 0.81, TypeScript, Expo Router, Zustand, React Query, Tamagui, Express, Prisma, SQLite"
+      languages: "English, Japanese, Uzbek"
+    metrics:
+      supported_currencies: 12
+      invite_input_methods: 2
+      avatar_storage_modes: 2
+
 status_id: "2025-09-03-requests-ui-and-uniqueid-remove"
 timestamp: "2025-09-03T02:48:44+05:00"  # Asia/Tashkent
 roadmap_ref:
