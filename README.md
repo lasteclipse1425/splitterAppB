@@ -2,6 +2,8 @@
 
 # Receipt Splitter Starter
 
+Документация на [English](./README.en.md).
+
 Учебный starter-project для приложения разделения счета:
 
 - `frontend/` - React Native Expo app
