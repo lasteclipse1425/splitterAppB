@@ -1,39 +1,36 @@
-!!!A project received from the university during a co-working session. The project is poorly written and raw. I changed some things to make it more convenient for students to work with. This is a better version of the original code.
-
 # Receipt Splitter Starter
 
-Документация на [English](./README.en.md).
+Russian version: [README.ru.md](./README.ru.md).
 
-Учебный starter-project для приложения разделения счета:
+A student starter project for splitting a restaurant bill:
 
-- `frontend/` - React Native Expo app
-- `backend/` - Node.js + Express API
-- SQLite
-- Prisma ORM
-- Docker Compose для backend + database
+- `frontend/` — React Native Expo app
+- `backend/` — Node.js + Express API
+- SQLite with Prisma ORM
+- Docker Compose for the backend and database
 
-Главная цель проекта: студент должен скачать репозиторий, выполнить инструкции и запустить приложение без угадывания портов, IP-адресов и env-переменных.
+The goal is to let students clone the repository, follow the setup instructions, and run the app without guessing ports, IP addresses, or environment variables.
 
-## Возможности приложения
+## Features
 
-- Сфотографируйте бумажный чек: backend распознает позиции, цены и валюту. Если распознавание не удалось, приложение покажет ошибку и не подменит чек тестовыми данными.
-- Выберите участников, распределите позиции поровну или по количеству заказанных единиц и посмотрите итоговые суммы.
-- Добавляйте друзей по QR-коду или вставленной ссылке-приглашению. Для QR-кодов чеков используется фотография/OCR; QR-приглашения относятся к друзьям и группам.
-- Просматривайте историю разделенных счетов.
-- В профиле доступны изменение имени, email, фотографии, пароля, языка, темы и валюты по умолчанию. Для каждого счета валюту можно изменить отдельно.
-- Поддерживаются UZS, USD, EUR, RUB, GBP, JPY, KZT, CNY, TRY, AED, KRW и INR. Выбор валюты меняет обозначение и формат отображения суммы, но не конвертирует ее по курсу.
+- Photograph a paper receipt. The backend recognizes item names, prices, and currency. If recognition fails, the app shows an error instead of substituting test data.
+- Choose the people at the table, split items equally or by quantity, and review each person's total.
+- Add friends by scanning a QR code or pasting an invitation link. Receipt scanning uses a photo and OCR; friend and group invitations use QR links.
+- Review past bill-splitting sessions.
+- Edit your username, email, avatar, password, language, theme, and default currency in your profile. You can choose a separate currency for each bill.
+- Supported currencies: UZS, USD, EUR, RUB, GBP, JPY, KZT, CNY, TRY, AED, KRW, and INR. Currency selection changes the currency label and number formatting; it does not convert amounts using exchange rates.
 
-Для локального Docker запуска фото профилей сохраняются в постоянный том `/app/data/avatars`. Для production-хостинга без постоянного локального диска настройте Cloudflare R2 (`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `CDN_BASE_URL`).
+In local Docker mode, profile photos are stored in the persistent `/app/data/avatars` volume. For production hosting without persistent local storage, configure Cloudflare R2 using `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, and `CDN_BASE_URL`.
 
-## Требования
+## Requirements
 
-- Node.js 18 или 20 LTS. Рекомендуется Node.js 20.
+- Node.js 18 or 20 LTS (Node.js 20 is recommended)
 - npm 9+
 - Docker Desktop
 - Git
-- Expo Go на телефоне, если запускаете mobile version
+- Expo Go on your phone for the mobile workflow
 
-Проверка:
+Check your setup:
 
 ```bash
 node -v
@@ -42,191 +39,171 @@ docker --version
 docker compose version
 ```
 
-Можно также запустить:
+You can also run:
 
 ```bash
 npm run doctor
 ```
 
-## Быстрый старт
+## Quick start
 
-1. Установите зависимости:
+1. Install dependencies:
 
-```bash
-npm run setup
-```
+   ```bash
+   npm run setup
+   ```
 
-2. Запустите backend через Docker:
+2. Start the backend with Docker:
 
-```bash
-npm run backend:docker
-```
+   ```bash
+   npm run backend:docker
+   ```
 
-Backend будет доступен здесь:
+   The backend is available at `http://localhost:8080`. Check it with:
 
-```text
-http://localhost:8080
-```
+   ```bash
+   curl http://localhost:8080/health
+   ```
 
-Проверка backend:
+   Expected response:
 
-```bash
-curl http://localhost:8080/health
-```
+   ```json
+   { "status": "ok" }
+   ```
 
-Ожидаемый ответ:
+3. Find your computer's local IP address:
 
-```json
-{ "status": "ok" }
-```
+   ```bash
+   npm run ip
+   ```
 
-3. Узнайте локальный IP компьютера:
+4. Create `frontend/.env` from the example:
 
-```bash
-npm run ip
-```
+   Windows PowerShell:
 
-Пример:
+   ```powershell
+   Copy-Item frontend/.env.example frontend/.env
+   ```
 
-```text
-EXPO_PUBLIC_API_URL=http://192.168.1.23:8080
-```
+   macOS/Linux:
 
-4. Создайте `frontend/.env`:
+   ```bash
+   cp frontend/.env.example frontend/.env
+   ```
 
-```bash
-copy frontend\.env.example frontend\.env
-```
+   If you are using Expo Go on your phone, set `EXPO_PUBLIC_API_URL` to your computer's IP address, for example `http://192.168.1.23:8080`.
 
-На macOS/Linux:
+5. Check the environment files:
 
-```bash
-cp frontend/.env.example frontend/.env
-```
+   ```bash
+   npm run check-env
+   ```
 
-Замените `EXPO_PUBLIC_API_URL` на IP из шага выше, если запускаете через Expo Go на телефоне.
+6. Start the frontend:
 
-5. Проверьте env:
+   ```bash
+   npm run frontend:dev
+   ```
 
-```bash
-npm run check-env
-```
+   Open Expo Go on your phone and scan the QR code shown in the terminal.
 
-6. Запустите frontend:
+## Expo Go: localhost vs. local IP
 
-```bash
-npm run frontend:dev
-```
-
-Откройте Expo Go на телефоне и отсканируйте QR-код.
-
-## Expo Go: localhost vs local IP
-
-Если frontend открыт на телефоне, `localhost` означает сам телефон, а не ваш компьютер. Поэтому для Expo Go нужен адрес вида:
+On a phone, `localhost` refers to the phone itself, not your computer. For Expo Go, use your computer's local IP:
 
 ```text
 EXPO_PUBLIC_API_URL=http://YOUR_COMPUTER_IP:8080
 ```
 
-Для web preview на том же компьютере можно использовать:
+For a web preview running on the same computer, you can use:
 
 ```text
 EXPO_PUBLIC_API_URL=http://localhost:8080
 ```
 
-## Полезные команды
+## Useful commands
 
 ```bash
-npm run doctor                 # Проверить Node/npm/Docker/env
-npm run check-env              # Проверить .env файлы
-npm run ip                     # Показать локальные IP адреса
-npm run backend:docker         # Запустить backend (SQLite в Docker volume)
-npm run backend:docker:detached # Запустить Docker в фоне
-npm run backend:logs           # Смотреть логи backend
-npm run backend:stop           # Остановить Docker containers
-npm run frontend:dev           # Запустить Expo
-npm run frontend:start:clean   # Запустить Expo с очисткой cache
-npm run frontend:web           # Web preview, экспериментально
+npm run doctor                   # Check Node, npm, Docker, and environment files
+npm run check-env                # Validate .env files
+npm run ip                       # Show local IP addresses
+npm run backend:docker           # Start the backend (SQLite in a Docker volume)
+npm run backend:docker:detached  # Start Docker in the background
+npm run backend:logs             # View backend logs
+npm run backend:stop             # Stop Docker containers
+npm run frontend:dev             # Start Expo
+npm run frontend:start:clean     # Start Expo and clear its cache
+npm run frontend:web             # Start an experimental web preview
 ```
 
 ## Docker setup
 
-Файл `backend/docker-compose.yml` поднимает backend на порту `8080` с SQLite базой в Docker volume.
+`backend/docker-compose.yml` starts the backend on port `8080` and stores the SQLite database in a Docker volume. On startup, the backend runs `prisma migrate deploy` to apply existing database migrations.
 
-При запуске backend автоматически выполняет:
-
-```bash
-prisma migrate deploy
-```
-
-Это применяет уже существующие migrations к базе данных.
-
-Остановить проект:
+Stop the project:
 
 ```bash
 npm run backend:stop
 ```
 
-Остановить и удалить volume базы данных:
+Stop the project and remove the database volume:
 
 ```bash
 docker compose -f backend/docker-compose.yml down -v
 ```
 
-Внимание: `down -v` удалит SQLite данные в Docker volume.
+Warning: `down -v` deletes the SQLite data stored in the Docker volume.
 
-## Backend local dev without Docker
+## Run the backend locally without Docker
 
-Для большинства студентов проще использовать Docker. Если вы хотите запускать backend локально:
+Docker is the simplest option for most students. To run the backend directly:
 
 ```bash
-copy backend\.env.example backend\.env
+Copy-Item backend/.env.example backend/.env  # Windows PowerShell
 npm --prefix backend install
 npm --prefix backend run db:migrate
 npm run backend:dev
 ```
 
-Убедитесь, что `DATABASE_URL` в `backend/.env` указывает на SQLite файл (см. `backend/.env.example`).
+On macOS/Linux, replace the first command with `cp backend/.env.example backend/.env`. Make sure `DATABASE_URL` in `backend/.env` points to a SQLite file (see `backend/.env.example`).
 
 ## Web mode
 
-Mobile flow через Expo Go является основным учебным сценарием. Web mode оставлен для preview:
+The main student workflow is the mobile app in Expo Go. Web mode is available for preview:
 
 ```bash
 npm run frontend:web
 ```
 
-Если web mode нестабилен, сначала проверяйте mobile flow. В проекте есть зависимости React Native/Expo/Tamagui, которые могут вести себя по-разному в web bundle.
+If web mode is unstable, use the mobile workflow first. React Native, Expo, and Tamagui dependencies may behave differently in a web bundle.
 
-## Как добавить свою feature
+## Adding a feature
 
-1. Backend route добавляйте в `backend/src/routes/`.
-2. Подключайте route в `backend/src/server.ts`.
-3. Если нужны новые таблицы, меняйте `backend/prisma/schema.prisma`.
-4. Создавайте migration:
+1. Add backend routes under `backend/src/routes/`.
+2. Register routes in `backend/src/server.ts`.
+3. Update `backend/prisma/schema.prisma` if you need database tables.
+4. Create a migration:
 
-```bash
-npm --prefix backend run db:migrate
-```
+   ```bash
+   npm --prefix backend run db:migrate
+   ```
 
-5. Frontend API helper добавляйте в `frontend/src/features/<feature>/api/`.
-6. Screen добавляйте в `frontend/app/`.
-7. Проверяйте через Expo Go и backend health check.
+5. Add frontend API helpers under `frontend/src/features/<feature>/api/`.
+6. Add screens under `frontend/app/`.
+7. Check the flow in Expo Go and verify the backend health endpoint.
 
-Подробнее: [ARCHITECTURE.md](./ARCHITECTURE.md).
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for more details.
 
-## Частые ошибки
+## Troubleshooting
 
-- `ERR_NETWORK`: телефон не видит backend. Проверьте IP, firewall и `EXPO_PUBLIC_API_URL`.
-- Docker Desktop не запущен: запустите Docker Desktop и повторите `npm run backend:docker`.
-- Node слишком новый: используйте Node.js 20 LTS.
-- Expo cache сломан: `npm run frontend:start:clean`.
-- Backend не отвечает: `curl http://localhost:8080/health` и `npm run backend:logs`.
+- `ERR_NETWORK`: The phone cannot reach the backend. Check the IP address, firewall, and `EXPO_PUBLIC_API_URL`.
+- Docker Desktop is not running: Start Docker Desktop, then run `npm run backend:docker` again.
+- Node.js version issues: Use Node.js 20 LTS.
+- Expo cache problems: Run `npm run frontend:start:clean`.
+- Backend is not responding: Check `curl http://localhost:8080/health` and `npm run backend:logs`.
 
-Большой список решений: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
+See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for more solutions.
 
-## Подробный setup для новичков
+## Beginner setup guide
 
-Если вы никогда не работали с Docker, Expo, React Native или `.env`, начните здесь:
-
-[BEGINNER_SETUP.md](./BEGINNER_SETUP.md)
+If you are new to Docker, Expo, React Native, or `.env` files, start with [BEGINNER_SETUP.md](./BEGINNER_SETUP.md).
