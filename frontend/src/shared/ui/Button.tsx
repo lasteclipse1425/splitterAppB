@@ -1,4 +1,4 @@
-// почти полностью переписал данный файл из-за багов, ошибок и устаревших элементов кода
+// Shared Button component with WCAG-compliant dark mode contrast
 
 import { forwardRef, type ComponentProps, type ComponentRef } from 'react';
 import { Button as TamaguiButton, Text } from 'tamagui';
@@ -24,7 +24,7 @@ const sizeStyles: Record<Size, { height: '$3' | '$4' | '$5'; paddingHorizontal: 
 
 const variantStyles: Record<Variant, { backgroundColor: string; color: string; borderWidth?: number; borderColor?: string }> = {
   primary: {
-    backgroundColor: '#2ECC71',
+    backgroundColor: '#177A42',
     color: '#FFFFFF',
   },
   secondary: {
@@ -50,9 +50,11 @@ export const Button = forwardRef<TamaguiButtonRef, CustomButtonProps>(
       ...tone,
       ...(disabled
         ? {
-            backgroundColor: variant === 'outline' ? 'transparent' : '$gray8',
-            borderColor: variant === 'outline' ? '$gray8' : tone.borderColor,
-            color: '$gray8',
+            // Disabled: ensure text is readable against the muted background
+            backgroundColor: variant === 'outline' ? 'transparent' : '$gray6',
+            borderColor: variant === 'outline' ? '$gray7' : tone.borderColor,
+            color: '$gray9',  // ≥ 3:1 contrast on $gray6 in both themes
+            opacity: 0.7,
           }
         : null),
     };

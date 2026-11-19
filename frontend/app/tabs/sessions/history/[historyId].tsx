@@ -15,6 +15,7 @@ import type {
 import { CURRENCY_OPTIONS, formatCurrencyAmount } from '@/shared/config/currencies';
 import { SessionsHistoryApi } from '@/features/sessions/api/history.api';
 import { useAppStore } from '@/shared/lib/stores/app-store';
+import { useCurrencyConverter } from '@/shared/lib/currency-converter';
 
 const DEFAULT_CURRENCY = 'UZS';
 const fmtCurrency = (value: number, currency: string) => `${currency} ${formatCurrencyAmount(value, currency)}`;
@@ -98,8 +99,10 @@ export default function HistoryDetailsScreen() {
   const error = useSessionsHistoryStore(state => state.error);
   const fetchHistory = useSessionsHistoryStore(state => state.fetchHistory);
   const currentUser = useAppStore(state => state.user);
+  const currencyConverter = useCurrencyConverter();
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paidUniqueIds, setPaidUniqueIds] = useState<string[]>([]);
+  const [rateNotice, setRateNotice] = useState<string | null>(null);
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -144,8 +147,29 @@ export default function HistoryDetailsScreen() {
     }
   };
   const [targetCurrency, setTargetCurrency] = useState('');
-  const [exchangeRate, setExchangeRate] = useState('');
-  const convertedTotal = Number(exchangeRate) > 0 ? (bill?.grandTotal ?? 0) * Number(exchangeRate) : null;
+  const historyRate = targetCurrency ? currencyConverter.getRate(currency, targetCurrency) : null;
+  const convertedTotal = targetCurrency && historyRate !== null
+    ? currencyConverter.convert(bill?.grandTotal ?? 0, currency, targetCurrency)
+    : null;
+  const formatDisplayedCurrency = (value: number) => {
+    const displayCurrency = targetCurrency || currency;
+    const converted = targetCurrency
+      ? currencyConverter.convert(value, currency, targetCurrency)
+      : value;
+    return fmtCurrency(converted, displayCurrency);
+  };
+
+  const selectTargetCurrency = async (target: string) => {
+    setRateNotice(null);
+    if (!currencyConverter.getRate(currency, target)) {
+      await currencyConverter.refresh();
+      if (!currencyConverter.getRate(currency, target)) {
+        setRateNotice(`No live or configured exchange rate is available for ${currency} to ${target}.`);
+        return;
+      }
+    }
+    setTargetCurrency(target);
+  };
 
   const shareBill = async () => {
     if (!bill) return;
@@ -198,7 +222,7 @@ export default function HistoryDetailsScreen() {
             {`${formatSessionDate(bill.finalizedAt || bill.createdAt)} ${BULLET} ${(bill.participants ?? []).length} ishtirokchi`}
           </Text>
           <Text fontSize={16} fontWeight="700" color="#2ECC71">
-            {fmtCurrency(bill.grandTotal ?? 0, currency)}
+            {formatDisplayedCurrency(bill.grandTotal ?? 0)}
           </Text>
           <Button onPress={shareBill} alignSelf="flex-start">Share bill</Button>
           {currentUser?.uniqueId && bill.participantUniqueIds.includes(currentUser.uniqueId) && (
@@ -208,11 +232,14 @@ export default function HistoryDetailsScreen() {
           )}
           <YStack gap="$2" p="$3" borderWidth={1} borderColor="$gray5" borderRadius={12}>
             <Text fontSize={14} fontWeight="700">Currency converter</Text>
-            <Text fontSize={11} color="$gray10">Enter the exchange rate from {currency} to your selected currency.</Text>
+            <Text fontSize={11} color="$gray10">Select a display currency. The saved receipt amounts remain in {currency}.</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <XStack gap="$2">
+                <Button size="$2" onPress={() => { setTargetCurrency(''); setRateNotice(null); }} theme={!targetCurrency ? 'active' : undefined}>
+                  Original · {currency}
+                </Button>
                 {CURRENCY_OPTIONS.filter((option) => option.code !== currency).map((option) => (
-                  <Button key={option.code} size="$2" onPress={() => setTargetCurrency(option.code)} theme={targetCurrency === option.code ? 'active' : undefined}>
+                  <Button key={option.code} size="$2" onPress={() => { void selectTargetCurrency(option.code); }} theme={targetCurrency === option.code ? 'active' : undefined}>
                     {option.code}
                   </Button>
                 ))}
@@ -220,15 +247,23 @@ export default function HistoryDetailsScreen() {
             </ScrollView>
             {targetCurrency ? (
               <>
-                <Input value={exchangeRate} onChangeText={(value) => setExchangeRate(value.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder={`1 ${currency} = ? ${targetCurrency}`} accessibilityLabel="Exchange rate" />
+                <Text fontSize={11} color="$gray10">
+                  {historyRate !== null
+                    ? `1 ${currency} = ${currencyConverter.formatRate(historyRate)} ${targetCurrency} · ${currencyConverter.source}${currencyConverter.isStale ? ' · stale' : ''}`
+                    : `No rate available for ${currency} to ${targetCurrency}.`}
+                </Text>
                 {convertedTotal != null && (
-                  <Text fontSize={14} color="$gray11">Approx. {fmtCurrency(convertedTotal, targetCurrency)}</Text>
+                  <Text fontSize={14} fontWeight="700" color="$gray11">{fmtCurrency(convertedTotal, targetCurrency)}</Text>
                 )}
               </>
             ) : null}
+            {!!rateNotice && <Text fontSize={12} color="$red10">{rateNotice}</Text>}
             {!targetCurrency && (
-              <Text fontSize={12} color="$gray10">Choose a currency to see an approximate conversion.</Text>
+              <Text fontSize={12} color="$gray10">Choose a currency to convert the bill using a live or cached rate.</Text>
             )}
+            <Button size="$2" chromeless alignSelf="flex-start" onPress={() => { void currencyConverter.refresh(); }}>
+              Refresh rates
+            </Button>
           </YStack>
         </YStack>
 
@@ -239,7 +274,7 @@ export default function HistoryDetailsScreen() {
             borderWidth={1}
             borderColor="#2ECC71"
             br={12}
-            bg="white"
+            bg="$color1"
             px={16}
             py={12}
             gap="$3"
@@ -256,7 +291,7 @@ export default function HistoryDetailsScreen() {
                 <Text fontSize={16} fontWeight="600">{participant.username}</Text>
               </XStack>
               <Text fontSize={16} fontWeight="700" color="#2ECC71">
-                {fmtCurrency(amount, currency)}
+                {formatDisplayedCurrency(amount)}
               </Text>
             </XStack>
             <Text fontSize={12} color={paidUniqueIds.includes(participant.uniqueId) ? '$green10' : '$gray9'}>
@@ -269,7 +304,7 @@ export default function HistoryDetailsScreen() {
                   <XStack key={item.id} jc="space-between" ai="center">
                     <Text fontSize={14}>{item.title}</Text>
                     <Text fontSize={14} fontWeight="600" color="#2ECC71">
-                      {item.price.toLocaleString()}
+                      {formatDisplayedCurrency(item.price)}
                     </Text>
                   </XStack>
                 ))

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"No automated tests are configured yet\" && exit 0",
+    "test": "npm run build && node --test dist/services/receiptParser.test.js",
     "dev": "node --loader ts-node/esm -r dotenv/config src/server.ts",
     "start": "node --loader ts-node/esm -r dotenv/config src/server.ts",
     "build": "tsc -p tsconfig.json",

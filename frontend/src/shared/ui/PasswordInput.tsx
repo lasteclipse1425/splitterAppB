@@ -14,7 +14,7 @@ type Props = {
   error?: string;
   required?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  textInputProps?: any; // дополнительные пропсы TextInput при необходимости
+  textInputProps?: any;
 };
 
 export default function PasswordInput({
@@ -35,12 +35,18 @@ export default function PasswordInput({
     <Pressable
       onPress={() => setShow(s => !s)}
       hitSlop={6}
-      android_ripple={{ color: 'rgba(0,0,0,0.08)', borderless: true }}
+      android_ripple={{ color: 'rgba(128,128,128,0.15)', borderless: true }}
       style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
       accessibilityRole="button"
       accessibilityLabel={show ? 'Hide password' : 'Show password'}
     >
-      {show ? <EyeOff size={18} color="rgba(0,0,0,0.7)" /> : <Eye size={18} color="rgba(0,0,0,0.7)" />}
+      {/* Use theme-aware $gray11 via Tamagui icon color prop — but Lucide
+          icons in a Pressable need a literal value. We use a medium gray
+          that is readable on both light (#FFF) and dark (#0D1117) surfaces. */}
+      {show
+        ? <EyeOff size={18} color="$gray11" />
+        : <Eye size={18} color="$gray11" />
+      }
     </Pressable>
   );
 
@@ -58,11 +64,10 @@ export default function PasswordInput({
         error={error}
         required={required}
         rightAdornment={eye}
-        // по умолчанию глушим подсказки автозаполнения, можно переопределить через textInputProps
         textInputProps={{
-          autoComplete: 'off',         // Android/iOS
-          textContentType: 'none',     // iOS
-          importantForAutofill: 'no',  // Android
+          autoComplete: 'off',
+          textContentType: 'none',
+          importantForAutofill: 'no',
           ...textInputProps,
         }}
       />

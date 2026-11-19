@@ -1,0 +1,59 @@
+[
+  {
+    "name": "space grouped UZS amount",
+    "input": {
+      "items": [
+        { "id": "1", "name": "Творог", "unitPrice": "120 020", "quantity": "1", "totalPrice": "120 020", "kind": "item", "confidence": 0.96 }
+      ],
+      "summary": { "grandTotal": "120 020", "currency": "UZS" }
+    },
+    "expected": { "names": ["Творог"], "quantities": [1], "unitPrices": [120020], "grandTotal": 120020 }
+  },
+  {
+    "name": "quantity, service fee, and printed total",
+    "input": {
+      "items": [
+        { "id": "1", "name": "Сок", "unitPrice": "15 000", "quantity": "2 x", "totalPrice": "30 000", "kind": "item", "confidence": 0.94 },
+        { "id": "2", "name": "Обслуживание", "unitPrice": "750", "quantity": 1, "totalPrice": "750", "kind": "fee", "confidence": 0.8 }
+      ],
+      "summary": { "grandTotal": "31 500", "subtotal": "30 000", "tax": "750", "currency": "UZS" }
+    },
+    "expected": { "names": ["Сок", "Обслуживание"], "quantities": [2, 1], "unitPrices": [15000, 750], "grandTotal": 31500, "tax": 750 }
+  },
+  {
+    "name": "non-item totals and payment lines",
+    "input": {
+      "items": [
+        { "id": "1", "name": "Кофе", "unitPrice": "12 000", "quantity": 1, "totalPrice": "12 000", "kind": "item", "confidence": 0.9 },
+        { "id": "2", "name": "ИТОГО", "unitPrice": "20 000", "quantity": 1, "totalPrice": "20 000", "kind": "item" },
+        { "id": "3", "name": "СДАЧА", "unitPrice": "3 000", "quantity": 1, "totalPrice": "3 000", "kind": "item" },
+        { "id": "4", "name": "НДС", "unitPrice": "1 000", "quantity": 1, "totalPrice": "1 000", "kind": "tax" },
+        { "id": "5", "name": "СТОИМОСТЬ", "unitPrice": "12 000", "quantity": 1, "totalPrice": "12 000", "kind": "item" },
+        { "id": "6", "name": "Card payment", "unitPrice": "12 000", "quantity": 1, "totalPrice": "12 000", "kind": "payment" }
+      ],
+      "summary": { "grandTotal": "13 000", "currency": "UZS" }
+    },
+    "expected": { "names": ["Кофе"], "quantities": [1], "unitPrices": [12000], "grandTotal": 13000 }
+  },
+  {
+    "name": "fractional weight quantity and unit price",
+    "input": {
+      "items": [
+        { "id": "1", "name": "Товар на вес", "unitPrice": "50 000", "quantity": "0.5 kg", "totalPrice": "25 000", "kind": "item", "confidence": 0.88 }
+      ],
+      "summary": { "grandTotal": "25 000", "currency": "UZS" }
+    },
+    "expected": { "names": ["Товар на вес"], "quantities": [0.5], "unitPrices": [50000], "grandTotal": 25000 }
+  },
+  {
+    "name": "noisy decimal and inconsistent line total",
+    "input": {
+      "items": [
+        { "id": "1", "name": "Весовой товар", "unitPrice": "1 200,50", "quantity": "2 x", "totalPrice": "2 500,00", "kind": "item", "confidence": 0.9 },
+        { "id": "2", "name": "broken price row", "unitPrice": "??", "quantity": "1", "kind": "item" }
+      ],
+      "summary": { "grandTotal": "2 500,00", "currency": "UZS" }
+    },
+    "expected": { "names": ["Весовой товар"], "quantities": [2], "unitPrices": [1250], "grandTotal": 2500, "hasWarnings": true }
+  }
+]

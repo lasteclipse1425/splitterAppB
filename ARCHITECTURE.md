@@ -49,6 +49,8 @@ app.use("/uploads", uploadsRoutes);
 
 The `/sessions/scan` route parses receipt photos before it creates a session. Failed OCR returns an error instead of a sample receipt. The `/friends/invite` and `/friends/join` routes issue and redeem short-lived signed invite tokens.
 
+The camera flow uses on-device text extraction with overlapping image bands and an editable item review step. The `/sessions/scan` Gemini path normalizes OCR/model number strings, preserves printed totals, filters receipt metadata, and returns warnings for uncertain lines.
+
 Avatar uploads use Cloudflare R2 when configured. Local development and Docker Compose can use the persistent avatar directory (`data/avatars` or `/app/data/avatars`), served under `/media/avatars`. Docker's `/app/data` volume holds both SQLite data and local avatars; only the avatar subdirectory is public.
 
 Health check:
@@ -104,6 +106,7 @@ Important files:
 - `frontend/src/shared/config/env.ts` - frontend env validation and API URL
 - `frontend/src/shared/ui/` - reusable UI components
 - `frontend/src/shared/config/currencies.ts` - supported currencies and currency-aware number formatting
+- `frontend/src/shared/lib/currency-converter.ts` - live/cached currency conversion and explicit offline overrides
 - `frontend/src/shared/lib/stores/app-store.tsx` - persisted theme, language, and preferred currency
 - `frontend/app.json` - Expo configuration
 - `frontend/metro.config.js` - Metro resolver workarounds
@@ -143,7 +146,11 @@ http://localhost:8080
 
 On startup it applies Prisma migrations and starts Express.
 
-Docker Compose also persists local avatar files in `/app/data/avatars`. The app uses the dark/light theme selected in the profile screen. Receipt currency may be changed per bill; no exchange-rate conversion is performed.
+Docker Compose also persists local avatar files in `/app/data/avatars`. The app uses the dark/light theme selected in the profile screen.
+
+Receipt amounts remain in the currency in which they were entered or recognized. The frontend converts displayed amounts and finalization payloads using live USD-based rates from `open.er-api.com` (with ExchangeRate-API as a fallback), cached in AsyncStorage for 30 minutes. Offline conversion uses only a previously fetched rate or explicitly configured `EXPO_PUBLIC_EXCHANGE_RATE_OVERRIDES`; without either, the app does not change the selected currency or present an unconverted amount under a new currency label. The receipt screen shows the active rate source.
+
+Backend parser regression tests run with `npm --prefix backend test`.
 
 Default local port:
 

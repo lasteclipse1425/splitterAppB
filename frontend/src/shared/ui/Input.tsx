@@ -68,13 +68,13 @@ export function Input({
           paddingRight={rightAdornment ? 44 : undefined}
           borderRadius="$4"
           borderWidth={1}
-          borderColor={error ? '$red8' : '$gray7'}
-          backgroundColor="#FFFFFF"
+          borderColor={error ? '$red8' : '$borderColor'}
+          backgroundColor="$background"
           height="$4"
           fontSize="$4"
-          color="#111827"
-          placeholderTextColor="#6B7280"
-          focusStyle={{ borderColor: error ? '$red8' : '$green9' }}
+          color="$color"
+          placeholderTextColor="$gray10"
+          focusStyle={{ borderColor: error ? '$red8' : '$borderColorFocus' }}
           {...webIdentityProps}
           {...textInputProps}
         />

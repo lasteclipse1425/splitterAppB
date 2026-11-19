@@ -40,6 +40,7 @@ export interface ReceiptSessionMeta {
   sessionName: string;
   language: string;
   summary?: ReceiptSummary;
+  warnings?: string[];
 }
 
 export type FinishPayload = {
@@ -65,6 +66,7 @@ interface ReceiptSessionStore {
   items: ReceiptSplitItem[];
   participants: ReceiptParticipant[];
   currency: string; // ✅ Добавлено поле для валюты
+  sourceCurrency: string;
   finalizing: boolean;
   finalizeError?: string;
   finalized?: FinalizeReceiptResponse;
@@ -75,6 +77,7 @@ interface ReceiptSessionStore {
   setSessionName: (sessionName: string) => void;
   setParticipants: (participants: ReceiptParticipant[]) => void;
   setCurrency: (currency: string) => void; // ✅ Добавлен метод
+  setReceiptCurrency: (currency: string) => void;
   updateItem: (itemId: string, updater: (prev: ReceiptSplitItem) => ReceiptSplitItem) => void;
   setItems: (items: ReceiptSplitItem[]) => void;
   startManualSession: (sessionId: number, sessionName: string, items: ReceiptSplitItem[]) => void;
@@ -86,7 +89,7 @@ interface ReceiptSessionStore {
 }
 
 const INITIAL_STATE: Pick<ReceiptSessionStore,
-  'capture' | 'parsing' | 'parseError' | 'session' | 'items' | 'participants' | 'currency' | 'finalizing' | 'finalizeError' | 'finalized' | 'lastFinishPayload'
+  'capture' | 'parsing' | 'parseError' | 'session' | 'items' | 'participants' | 'currency' | 'sourceCurrency' | 'finalizing' | 'finalizeError' | 'finalized' | 'lastFinishPayload'
 > = {
   capture: undefined,
   parsing: false,
@@ -95,6 +98,7 @@ const INITIAL_STATE: Pick<ReceiptSessionStore,
   items: [],
   participants: [],
   currency: 'UZS', // ✅ Значение по умолчанию
+  sourceCurrency: 'UZS',
   finalizing: false,
   finalizeError: undefined,
   finalized: undefined,
@@ -117,6 +121,7 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
   setParticipants: (participants) => set({ participants }),
 
   setCurrency: (currency) => set({ currency }), // ✅ Новый метод
+  setReceiptCurrency: (currency) => set({ currency, sourceCurrency: currency }),
 
   updateItem: (itemId, updater) => {
     set((state) => ({
@@ -134,6 +139,7 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
     items,
     participants: [],
     currency: useAppStore.getState().preferredCurrency || 'UZS',
+    sourceCurrency: useAppStore.getState().preferredCurrency || 'UZS',
     finalized: undefined,
     lastFinishPayload: undefined,
     finalizeError: undefined,
@@ -155,7 +161,7 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
         totalPrice: item.totalPrice,
         kind: item.kind,
         confidence: item.confidence,
-        splitMode: item.quantity > 1 ? 'count' : 'equal',
+        splitMode: item.quantity > 1 && Number.isInteger(item.quantity) ? 'count' : 'equal',
         assignedTo: [],
         perPersonCount: {},
       }));
@@ -174,10 +180,12 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
           sessionName: response.sessionName,
           language: response.language,
           summary: response.summary,
+          warnings: response.warnings,
         },
         items: splitItems,
         participants: [],
         currency: detectedCurrency, // ✅ Сохраняем валюту
+        sourceCurrency: detectedCurrency,
         finalized: undefined,
         finalizeError: undefined,
       });

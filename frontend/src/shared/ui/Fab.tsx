@@ -11,7 +11,7 @@ export default function Fab({ onPress }: Props) {
       w={44}
       h={44}
       borderRadius={22}
-      backgroundColor="#2ECC71"
+      backgroundColor="#177A42"
       pressStyle={{ backgroundColor: '#27AE60' }}
       icon={<Plus size={24} color="white" />}
       position="absolute"

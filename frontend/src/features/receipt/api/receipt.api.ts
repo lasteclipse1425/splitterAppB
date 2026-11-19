@@ -39,6 +39,7 @@ export interface ParseReceiptResponse {
   language: string;
   items: ParsedReceiptItem[];
   summary?: ReceiptSummary;
+  warnings?: string[];
 }
 
 export type ReceiptParticipant = {

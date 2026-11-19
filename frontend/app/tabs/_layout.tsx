@@ -22,7 +22,7 @@ function DotBadge({ value }: { value?: number }) {
       w={20} h={20}
       br={999}
       ai="center" jc="center"
-      backgroundColor="#2ECC71"
+      backgroundColor="#177A42"
     >
       <Text color="white" fontSize={10} fontWeight="700">
         {value}

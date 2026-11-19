@@ -62,8 +62,9 @@ export default function TopBar({ title, greeting = false }: Props) {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ backgroundColor: 'white', paddingTop: insets.top }}>
+    <SafeAreaView edges={['top']} style={{ backgroundColor: 'transparent', paddingTop: insets.top }}>
       <XStack
+        bg="$background"
         ai="center"
         jc="space-between"
         px="$4"
@@ -85,7 +86,7 @@ export default function TopBar({ title, greeting = false }: Props) {
             {requestsCount > 0 && (
               <Circle
                 size={10}
-                backgroundColor="#2ECC71"
+                backgroundColor="#177A42"
                 position="absolute"
                 top={-2}
                 right={-2}

@@ -15,6 +15,7 @@ export interface ParsedReceiptItem {
 export interface ParseResult {
   items: ParsedReceiptItem[];
   summary: { grandTotal: number; currency: string; tax?: number; tip?: number; subtotal?: number };
+  warnings?: string[];
   rawModelText?: string | undefined; // for debugging (only when DEBUG_PARSE=1)
   model?: string | undefined; // which model was used
   durationMs?: number | undefined;
@@ -156,21 +157,24 @@ function extractCurrencyCode(raw: any): string {
 const EXTRACTION_INSTRUCTIONS = `You are a receipt parser. Return ONLY valid JSON with this shape:
 {
   "items": [
-    { "id": "string", "name": "string", "unitPrice": number, "quantity": number, "totalPrice": number, "kind": "fee|tip|discount|item|other|null", "confidence": number }
+    { "id": "string", "name": "string", "unitPrice": number|string, "quantity": number|string, "totalPrice": number|string, "kind": "fee|item|other|null", "confidence": number }
   ],
-  "summary": { "grandTotal": number, "currency": "ISO_4217", "tax": number, "tip": number, "subtotal": number }
+  "summary": { "grandTotal": number|string, "currency": "ISO_4217", "tax": number|string, "tip": number|string, "subtotal": number|string }
 }
 Rules:
-- Numbers must use dot as decimal separator.
+- Read the whole receipt, including rows split across lines or aligned in separate columns. Keep each purchased line separate, even when names repeat.
+- Normalize prices such as "120 020", "120.020", and "120,020" as 120020 for currencies using grouped thousands. Accept decimal amounts such as "1 200,50" as 1200.5. Return numeric values when unambiguous; otherwise return the original numeric text so it can be normalized.
+- Recognize quantity forms "2 x ITEM", "ITEM x 2", "2 × 15 000", and weight/volume quantities. For "2 x 15 000", 15 000 is the unit price; when both unit and line total are printed, report both.
+- Put only purchased goods and explicitly charged service/fees in items. Mark service charges as kind "fee". Do not turn receipt headers, item-count lines, subtotal/grand total, taxes/VAT/НДС, discounts, change/СДАЧА, payment methods, or store details into items; report available totals/tax/tip in summary instead.
+- Join wrapped item names with their adjacent price row when the layout makes the match clear. Do not invent missing names or prices.
 - id: generate short stable IDs like "1", "2"... or semantic (e.g. FEE1) unique within list.
-- quantity >= 1.
-- totalPrice = unitPrice * quantity (round to 2 decimals).
-- Include service/tips/fees as separate items with kind set.
+- quantity must be positive; preserve fractional weight/volume quantities.
+- totalPrice is the printed line total when available, otherwise unitPrice * quantity (round to the currency precision).
 - If currency symbol present ignore it when recording numbers.
 - Detect the receipt currency (e.g. symbols like $, €, ₽ or textual names) and report the ISO 4217 code in uppercase.
 - When unsure about currency, return "UNKNOWN".
-- confidence: a number from 0.0 to 1.0 indicating how confident you are in reading this item correctly.
-- summary tax, tip, and subtotal should be extracted if available, otherwise omit. grandTotal = sum of item totalPrice values (after any discounts).`;
+- confidence: a number from 0.0 to 1.0; lower it for uncertain row alignment, wrapped names, quantity, or digits.
+- summary grandTotal must be the printed amount due, not the sum of item rows. Extract tax, tip, and subtotal when printed; omit unavailable values.`;
 
 function safeParseJson(text: string): { ok: boolean; data?: ParseResult } {
   try {
@@ -180,48 +184,161 @@ function safeParseJson(text: string): { ok: boolean; data?: ParseResult } {
     if (firstBrace === -1 || lastBrace === -1) return { ok: false };
     const jsonSlice = cleaned.slice(firstBrace, lastBrace + 1);
     const raw = JSON.parse(jsonSlice);
-    if (!raw || typeof raw !== "object") return { ok: false };
-    if (!Array.isArray(raw.items) || !raw.summary) return { ok: false };
-    // Basic normalization
-    const items: ParsedReceiptItem[] = raw.items.map((it: any, idx: number) => {
-      const q = Number(it.quantity ?? 1);
-      const unit = Number(it.unitPrice ?? it.price);
-      const total = Number(it.totalPrice ?? unit * q);
-      const name = typeof it.name === "string" ? it.name.trim() : "";
-      if (!name || !Number.isFinite(q) || q < 1 || !Number.isFinite(unit) || unit < 0 || !Number.isFinite(total) || total < 0) {
-        throw new Error(`Invalid receipt item at index ${idx}`);
-      }
-      return {
-        id: String(it.id ?? idx + 1),
-        name,
-        unitPrice: round2(unit),
-        quantity: q,
-        totalPrice: round2(total),
-        kind: it.kind ? String(it.kind) : undefined,
-        confidence: typeof it.confidence === 'number' ? it.confidence : 1.0,
-      };
-    });
-    const grandTotal = round2(
-      items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0)
-    );
-    const currency = extractCurrencyCode(raw);
-    return {
-      ok: true,
-      data: {
-        items,
-        summary: { 
-          grandTotal, 
-          currency,
-          tax: typeof raw.summary.tax === 'number' ? round2(raw.summary.tax) : undefined,
-          tip: typeof raw.summary.tip === 'number' ? round2(raw.summary.tip) : undefined,
-          subtotal: typeof raw.summary.subtotal === 'number' ? round2(raw.summary.subtotal) : undefined,
-        },
-        source: "gemini",
-      } as ParseResult,
-    };
+    const data = normalizeReceiptPayload(raw);
+    return data ? { ok: true, data } : { ok: false };
   } catch {
     return { ok: false };
   }
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Parse receipt numbers without confusing grouped thousands with decimals. */
+export function parseReceiptNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+
+  let normalized = value
+    .replace(/[\u00A0\u202F]/g, " ")
+    .replace(/[^\d.,+\-\s]/g, "")
+    .trim();
+  if (!normalized || !/\d/.test(normalized)) return null;
+
+  const sign = normalized.startsWith("-") ? "-" : "";
+  normalized = normalized.replace(/[+\-\s]/g, "");
+  const lastSeparator = Math.max(normalized.lastIndexOf("."), normalized.lastIndexOf(","));
+  if (lastSeparator < 0) {
+    const result = Number(`${sign}${normalized}`);
+    return Number.isFinite(result) ? result : null;
+  }
+
+  const fractionalDigits = normalized.length - lastSeparator - 1;
+  const hasBothSeparators = normalized.includes(".") && normalized.includes(",");
+  const hasRepeatedSeparator = /[.,].*[.,]/.test(normalized);
+  const isDecimal = fractionalDigits > 0 && fractionalDigits <= 2;
+  if (isDecimal && (hasBothSeparators || hasRepeatedSeparator || fractionalDigits <= 2)) {
+    const integerPart = normalized.slice(0, lastSeparator).replace(/[.,]/g, "");
+    const fractionPart = normalized.slice(lastSeparator + 1);
+    const result = Number(`${sign}${integerPart}.${fractionPart}`);
+    return Number.isFinite(result) ? result : null;
+  }
+
+  const result = Number(`${sign}${normalized.replace(/[.,]/g, "")}`);
+  return Number.isFinite(result) ? result : null;
+}
+
+function parseReceiptQuantity(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : null;
+  if (typeof value !== "string") return null;
+  const match = value.match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:[x×]|(?:шт|kg|кг|g|гр?|л|l|ml|мл))?\s*$/i)
+    ?? value.match(/^\s*(\d+(?:[.,]\d+)?)\s*[x×]/i);
+  if (!match) return null;
+  const quantity = parseReceiptNumber(match[1]);
+  return quantity !== null && quantity > 0 ? quantity : null;
+}
+
+function isNonItemLine(name: string): boolean {
+  const normalized = name.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return /^(?:итого|итог|всего|к оплате|сдача|ндс|налог|скидка|стоимость|subtotal|sub total|grand total|total|amount due|change|vat|tax|discount|payment|cash|card|cashier|thank you|receipt|invoice|order|table|стоимость товаров|сумма налога)$/.test(normalized)
+    || isServiceFeeLine(name);
+}
+
+function isServiceFeeLine(name: string): boolean {
+  const normalized = name.toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+\d+(?:[.,]\d+)?$/, "");
+  return /^(?:сервис|обслуживание|сервисный сбор|доставка|упаковка|service|service charge|service fee|delivery fee|packaging)$/.test(normalized);
+}
+
+export function normalizeReceiptPayload(raw: unknown): ParseResult | null {
+  if (!isRecord(raw) || !Array.isArray(raw.items) || !isRecord(raw.summary)) return null;
+
+  const warnings: string[] = [];
+  const items: ParsedReceiptItem[] = [];
+  for (const [index, rawItem] of raw.items.entries()) {
+    if (!isRecord(rawItem)) {
+      warnings.push(`Receipt line ${index + 1} could not be read.`);
+      continue;
+    }
+
+    const name = typeof rawItem.name === "string" ? rawItem.name.trim() : "";
+    const kind = typeof rawItem.kind === "string" ? rawItem.kind.toLowerCase() : undefined;
+    const excludedKind = ["tax", "tip", "discount", "subtotal", "total", "payment"].includes(kind ?? "");
+    const nonItemName = isNonItemLine(name);
+    if (!name || excludedKind || (nonItemName && !(kind === "fee" && isServiceFeeLine(name)))) {
+      if (name && isServiceFeeLine(name) && kind !== "fee") {
+        warnings.push(`Receipt line "${name}" looks like a service fee but was not classified as one; review it.`);
+      } else if (name && kind && !excludedKind && !nonItemName) {
+        warnings.push(`Receipt line "${name}" was classified as ${kind} and left out of purchased items.`);
+      }
+      continue;
+    }
+
+    const quantity = parseReceiptQuantity(rawItem.quantity ?? 1);
+    let unitPrice = parseReceiptNumber(rawItem.unitPrice ?? rawItem.price);
+    const printedTotal = parseReceiptNumber(rawItem.totalPrice);
+    if (quantity === null) {
+      warnings.push(`Quantity for "${name}" could not be read; review this item.`);
+      continue;
+    }
+    if (unitPrice === null && printedTotal !== null) unitPrice = printedTotal / quantity;
+    if (unitPrice === null || unitPrice < 0 || !Number.isFinite(unitPrice)) {
+      warnings.push(`Price for "${name}" could not be read; review this item.`);
+      continue;
+    }
+
+    let totalPrice = printedTotal ?? unitPrice * quantity;
+    let confidence = typeof rawItem.confidence === "number" && Number.isFinite(rawItem.confidence)
+      ? Math.min(1, Math.max(0, rawItem.confidence))
+      : 0.75;
+    if (printedTotal !== null && Math.abs(printedTotal - unitPrice * quantity) > 0.02) {
+      warnings.push(`Unit price and line total did not match for "${name}"; the printed line total was used.`);
+      unitPrice = printedTotal / quantity;
+      confidence = Math.min(confidence, 0.65);
+      totalPrice = printedTotal;
+    }
+    if (totalPrice < 0 || !Number.isFinite(totalPrice)) {
+      warnings.push(`Total for "${name}" could not be read; review this item.`);
+      continue;
+    }
+
+    items.push({
+      id: String(rawItem.id ?? index + 1),
+      name,
+      unitPrice: round2(unitPrice),
+      quantity,
+      totalPrice: round2(totalPrice),
+      ...(kind ? { kind } : {}),
+      confidence,
+    });
+  }
+
+  if (items.length === 0) return null;
+  const rawSummary = raw.summary;
+  const grandTotal = parseReceiptNumber(rawSummary.grandTotal)
+    ?? round2(items.reduce((sum, item) => sum + item.totalPrice, 0));
+  const summary: ParseResult["summary"] = {
+    grandTotal: round2(grandTotal),
+    currency: extractCurrencyCode(raw),
+  };
+  const tax = parseReceiptNumber(rawSummary.tax);
+  const tip = parseReceiptNumber(rawSummary.tip);
+  const subtotal = parseReceiptNumber(rawSummary.subtotal);
+  if (tax !== null && tax >= 0) summary.tax = round2(tax);
+  if (tip !== null && tip >= 0) summary.tip = round2(tip);
+  if (subtotal !== null && subtotal >= 0) summary.subtotal = round2(subtotal);
+
+  return {
+    items,
+    summary,
+    warnings: [...new Set(warnings)],
+    source: "gemini",
+  };
 }
 
 function unwrapMarkdown(t: string): string {

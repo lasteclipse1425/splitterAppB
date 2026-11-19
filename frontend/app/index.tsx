@@ -44,7 +44,7 @@ export default function Welcome() {
             {languages.map((lang) => (
               <YStack
                 key={lang.code}
-                backgroundColor={currentLanguage === lang.code ? "#2ECC71" : "transparent"}
+                backgroundColor={currentLanguage === lang.code ? "#177A42" : "transparent"}
                 borderRadius="$6"
                 paddingHorizontal="$3"
                 paddingVertical="$2"
@@ -70,7 +70,7 @@ export default function Welcome() {
           <YStack alignItems="center" gap="$5">
             <Circle 
               size={120}
-              backgroundColor="#2ECC71"
+              backgroundColor="#177A42"
               alignItems="center" 
               justifyContent="center"
               shadowColor="$shadowColor"

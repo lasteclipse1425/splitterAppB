@@ -241,12 +241,12 @@ export default function SessionParticipantsScreen() {
       height={29}
       borderRadius={10}
       borderWidth={1}
-      borderColor="#D9D9D9"
-      backgroundColor={on ? '#2ECC71' : 'transparent'}
+      borderColor="$gray6"
+      backgroundColor={on ? '#177A42' : 'transparent'}
       ai="center"
       jc="center"
     >
-      <Text fontSize={14} fontWeight="500" color={on ? '#FFFFFF' : '#2C3D4FCC'}>
+      <Text fontSize={14} fontWeight="500" color={on ? '#FFFFFF' : '$color'}>
         {on ? 'Selected' : 'Select'}
       </Text>
     </Button>
@@ -265,17 +265,17 @@ export default function SessionParticipantsScreen() {
       px={12}
       borderRadius={18}
       borderWidth={1}
-      borderColor={active ? '#2ECC71' : '#D9D9D9'}
-      backgroundColor={active ? '#2ECC71' : 'transparent'}
+      borderColor={active ? '#2ECC71' : '$gray6'}
+      backgroundColor={active ? '#177A42' : 'transparent'}
       ai="center"
       jc="center"
     >
       <XStack ai="center" gap="$1">
-        <UsersIcon size={14} color={active ? '#FFFFFF' : '#2C3D4FCC'} />
-        <Text fontSize={14} fontWeight="500" color={active ? '#FFFFFF' : '#2C3D4FCC'}>
+        <UsersIcon size={14} color={active ? '#FFFFFF' : '$color'} />
+        <Text fontSize={14} fontWeight="500" color={active ? '#FFFFFF' : '$color'}>
           {name}
         </Text>
-        <Text fontSize={12} color={active ? '#FFFFFF' : '#2C3D4FCC'}>
+        <Text fontSize={12} color={active ? '#FFFFFF' : '$gray10'}>
           · {typeof count === 'number' ? count : (loading ? '…' : '—')}
         </Text>
         {loading && <Spinner size="small" color={active ? 'white' : '$gray10'} />}
@@ -380,7 +380,7 @@ export default function SessionParticipantsScreen() {
           width={358}
           height={41}
           borderRadius={10}
-          backgroundColor="#2ECC71"
+          backgroundColor="#177A42"
           ai="center"
           jc="center"
           opacity={canNext ? 1 : 0.5}

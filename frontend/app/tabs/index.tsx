@@ -201,7 +201,7 @@ export default function HomePage() {
       <YStack f={1} ai="center" bg="$background">
         <YStack ai="center" mt="$6" mb="$4">
           <Pressable onPress={onScan}>
-            <Circle size={64} bg="#2ECC71" ai="center" jc="center" elevationAndroid={4}>
+            <Circle size={64} bg="#177A42" ai="center" jc="center" elevationAndroid={4}>
               <ScanLine size={26} color="white" />
             </Circle>
           </Pressable>

@@ -653,7 +653,7 @@ export default function FinishScreen() {
           unstyled
           height={41}
           borderRadius={10}
-          bg="#2ECC71"
+          bg="#177A42"
           ai="center"
           jc="center"
           onPress={() => router.replace('/tabs')}

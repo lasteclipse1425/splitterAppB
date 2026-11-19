@@ -89,9 +89,9 @@ function HistoryCard({
         h={110}
         br={12}
         borderWidth={1}
-        borderColor="#E4E7EB"
+        borderColor="$gray5"
         p="$3"
-        backgroundColor="white"
+        backgroundColor="$color1"
       >
         <XStack jc="space-between" ai="center">
           <YStack>
