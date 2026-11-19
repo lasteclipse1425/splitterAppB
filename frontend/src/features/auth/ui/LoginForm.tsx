@@ -198,7 +198,18 @@ export default function LoginForm() {
 
             {/* Forgot */}
             <XStack justifyContent="flex-end">
-              <Text fontSize="$3" color="#2ECC71" fontWeight="500">
+              <Text
+                fontSize="$3"
+                color="#2ECC71"
+                fontWeight="500"
+                onPress={() => showNotice(
+                  'error',
+                  t('auth.forgotPassword', 'Forgot Password?'),
+                  t('auth.passwordResetUnavailable', 'Password reset is not available yet. Please contact your administrator.')
+                )}
+                accessibilityRole="link"
+                pressStyle={{ opacity: 0.7 }}
+              >
                 {t('auth.forgotPassword', 'Forgot Password?')}
               </Text>
             </XStack>

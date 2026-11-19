@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, RefreshControl } from 'react-native';
-import { YStack, XStack, Text, ScrollView, View } from 'tamagui';
+import { YStack, XStack, Text, ScrollView, View, Input, Button } from 'tamagui';
 import { useTranslation } from 'react-i18next';
 
 import UserAvatar from '@/shared/ui/UserAvatar';
@@ -127,6 +127,8 @@ export default function SessionsHistoryScreen() {
   const refreshIfStale = useSessionsHistoryStore(state => state.refreshIfStale);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [period, setPeriod] = useState<'all' | '30' | '90'>('all');
 
   // FIX: ранее зависимости включали [initialized, loading, currentLimit, fetchHistory, refreshIfStale].
   // каждый вызов fetchHistory менял loading (false→true→false) и currentLimit,
@@ -152,6 +154,16 @@ export default function SessionsHistoryScreen() {
   }, [fetchHistory]);
 
   const history = useMemo<SessionHistoryEntry[]>(() => sessions, [sessions]);
+  const visibleHistory = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    const cutoff = period === 'all' ? 0 : Date.now() - Number(period) * 24 * 60 * 60 * 1000;
+    return history.filter((bill) => {
+      const haystack = [bill.sessionName, ...(bill.participants ?? []).map((p) => p.username)]
+        .join(' ').toLocaleLowerCase();
+      const timestamp = new Date(bill.finalizedAt || bill.createdAt || 0).getTime();
+      return (!query || haystack.includes(query)) && (!cutoff || (Number.isFinite(timestamp) && timestamp >= cutoff));
+    });
+  }, [history, search, period]);
 
   return (
     <YStack f={1} bg="$background" px="$4" pt="$4">
@@ -165,6 +177,17 @@ export default function SessionsHistoryScreen() {
         <YStack w={358} gap="$1" mb="$2">
           <Text fontSize={24} fontWeight="700">{t('history.title')}</Text>
           <Text fontSize={12} color="$gray10">{t('history.subtitle')}</Text>
+        </YStack>
+
+        <YStack w={358} gap="$2">
+          <Input value={search} onChangeText={setSearch} placeholder="Search bills or participants" accessibilityLabel="Search bill history" />
+          <XStack gap="$2">
+            {(['all', '30', '90'] as const).map((value) => (
+              <Button key={value} size="$2" onPress={() => setPeriod(value)} theme={period === value ? 'active' : undefined}>
+                {value === 'all' ? 'All time' : `Last ${value} days`}
+              </Button>
+            ))}
+          </XStack>
         </YStack>
 
         {loading && (
@@ -183,7 +206,7 @@ export default function SessionsHistoryScreen() {
           </Text>
         )}
 
-        {history.map((bill) => {
+        {visibleHistory.map((bill) => {
           const participants = bill.participants ?? [];
           const dateForSummary = bill.finalizedAt || bill.createdAt;
           const participantsLabel = t('history.participants', { count: participants.length });
@@ -207,6 +230,9 @@ export default function SessionsHistoryScreen() {
             />
           );
         })}
+        {!loading && history.length > 0 && visibleHistory.length === 0 && (
+          <Text color="$gray10" fontSize={14}>No bills match your search.</Text>
+        )}
       </ScrollView>
     </YStack>
   );

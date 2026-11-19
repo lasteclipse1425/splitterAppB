@@ -296,6 +296,8 @@ export default function ItemsSplitScreen() {
   }, [storeCurrency]);
 
   const [items, setLocalItems] = useState<Item[]>([]);
+  const [taxPercent, setTaxPercent] = useState('');
+  const [tipPercent, setTipPercent] = useState('');
 
   type Editing = {
     id: string;
@@ -854,7 +856,7 @@ export default function ItemsSplitScreen() {
   try {
     setStoreItems(toStoreItems(items));
 
-    const finalizeItems: FinalizeReceiptItemPayload[] = items.map((item) => {
+      const finalizeItems: FinalizeReceiptItemPayload[] = items.map((item) => {
       const mode = ensureMode(item);
 
       const payload: FinalizeReceiptItemPayload = {
@@ -880,6 +882,14 @@ export default function ItemsSplitScreen() {
   return payload;
 });
 
+      const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const tax = subtotal * Math.max(0, Number(taxPercent) || 0) / 100;
+      const tip = subtotal * Math.max(0, Number(tipPercent) || 0) / 100;
+      const extras: FinalizeReceiptItemPayload[] = [
+        ...(tax > 0 ? [{ id: 'splitter-tax', name: `Tax (${taxPercent}%)`, price: Math.round(tax * 100) / 100, quantity: 1, kind: 'fee', splitMode: 'equal' as const, assignedTo: participants.map((p) => p.uniqueId) }] : []),
+        ...(tip > 0 ? [{ id: 'splitter-tip', name: `Tip (${tipPercent}%)`, price: Math.round(tip * 100) / 100, quantity: 1, kind: 'fee', splitMode: 'equal' as const, assignedTo: participants.map((p) => p.uniqueId) }] : []),
+      ];
+
       const effectiveSessionId =
       session?.sessionId ??
       (sessionReceiptId && !isMockSession ? parseInt(sessionReceiptId, 10) : undefined);
@@ -897,7 +907,7 @@ export default function ItemsSplitScreen() {
         uniqueId: p.uniqueId,
         username: p.username,
       })),
-      items: finalizeItems,
+      items: [...finalizeItems, ...extras],
       currency: storeCurrency, // ✅ Добавьте эту строку
     });
 
@@ -1084,6 +1094,16 @@ export default function ItemsSplitScreen() {
                 ))}
               </XStack>
             </ScrollView>
+          </YStack>
+
+          {/* Bill currency */}
+          <YStack gap="$2" p="$3" borderWidth={1} borderColor="$gray5" borderRadius={12}>
+            <Text fontSize={14} fontWeight="700">Tax and tip</Text>
+            <Text fontSize={11} color="$gray10">Calculated on item subtotal and split equally between participants.</Text>
+            <XStack gap="$2">
+              <Input f={1} value={taxPercent} onChangeText={(value) => setTaxPercent(value.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="Tax %" accessibilityLabel="Tax percentage" />
+              <Input f={1} value={tipPercent} onChangeText={(value) => setTipPercent(value.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="Tip %" accessibilityLabel="Tip percentage" />
+            </XStack>
           </YStack>
 
           {/* Bill currency */}

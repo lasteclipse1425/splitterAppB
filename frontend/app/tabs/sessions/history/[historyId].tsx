@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Share, Alert } from 'react-native';
 import { YStack, XStack, Text, ScrollView, Button } from 'tamagui';
 
 import UserAvatar from '@/shared/ui/UserAvatar';
@@ -11,7 +12,9 @@ import type {
   SessionHistoryParticipantLight,
   SessionHistoryTotalsByParticipant,
 } from '@/features/sessions/api/history.api';
-import { formatCurrencyAmount } from '@/shared/config/currencies';
+import { CURRENCY_OPTIONS, formatCurrencyAmount } from '@/shared/config/currencies';
+import { SessionsHistoryApi } from '@/features/sessions/api/history.api';
+import { useAppStore } from '@/shared/lib/stores/app-store';
 
 const DEFAULT_CURRENCY = 'UZS';
 const fmtCurrency = (value: number, currency: string) => `${currency} ${formatCurrencyAmount(value, currency)}`;
@@ -94,6 +97,14 @@ export default function HistoryDetailsScreen() {
   const currentLimit = useSessionsHistoryStore(state => state.limit);
   const error = useSessionsHistoryStore(state => state.error);
   const fetchHistory = useSessionsHistoryStore(state => state.fetchHistory);
+  const currentUser = useAppStore(state => state.user);
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [paidUniqueIds, setPaidUniqueIds] = useState<string[]>([]);
+
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/tabs/sessions/history' as never);
+  };
 
   const bill: SessionHistoryEntry | undefined = useMemo(() => {
     if (!historyId) return undefined;
@@ -117,6 +128,39 @@ export default function HistoryDetailsScreen() {
     bill?.payload?.totals?.currency ||
     DEFAULT_CURRENCY;
 
+  useEffect(() => setPaidUniqueIds(bill?.payload?.paidUniqueIds ?? []), [bill]);
+
+  const toggleMyPayment = async () => {
+    const uniqueId = currentUser?.uniqueId;
+    if (!bill || !uniqueId || paymentBusy) return;
+    setPaymentBusy(true);
+    try {
+      const next = await SessionsHistoryApi.setPaymentStatus(bill.sessionId, !paidUniqueIds.includes(uniqueId));
+      setPaidUniqueIds(next);
+    } catch {
+      Alert.alert('Payment status not saved', 'Check your connection and try again.');
+    } finally {
+      setPaymentBusy(false);
+    }
+  };
+  const [targetCurrency, setTargetCurrency] = useState('');
+  const [exchangeRate, setExchangeRate] = useState('');
+  const convertedTotal = Number(exchangeRate) > 0 ? (bill?.grandTotal ?? 0) * Number(exchangeRate) : null;
+
+  const shareBill = async () => {
+    if (!bill) return;
+    const lines = [
+      bill.sessionName || 'Bill',
+      `${fmtCurrency(bill.grandTotal ?? 0, currency)} · ${formatSessionDate(bill.finalizedAt || bill.createdAt)}`,
+      ...participants.map(({ participant, amount }) => `${participant.username}: ${fmtCurrency(amount, currency)}`),
+    ];
+    try {
+      await Share.share({ message: lines.join('\n') });
+    } catch {
+      Alert.alert('Could not share bill', 'Please try again.');
+    }
+  };
+
   if (!bill && loading) {
     return (
       <YStack f={1} bg="$background" ai="center" jc="center">
@@ -134,7 +178,7 @@ export default function HistoryDetailsScreen() {
             {error}
           </Text>
         )}
-        <Button onPress={() => router.back()}>Go back</Button>
+        <Button onPress={goBack}>Go back</Button>
       </YStack>
     );
   }
@@ -147,7 +191,7 @@ export default function HistoryDetailsScreen() {
       >
         <YStack w={358} gap="$3">
           <Text fontSize={24} fontWeight="700">{bill.sessionName || 'Hisob'}</Text>
-          <Button unstyled alignSelf="flex-start" onPress={() => router.back()}>
+          <Button unstyled alignSelf="flex-start" onPress={goBack}>
             <Text color="#2ECC71">{'< Ortga'}</Text>
           </Button>
           <Text fontSize={14} color="$gray10">
@@ -156,6 +200,36 @@ export default function HistoryDetailsScreen() {
           <Text fontSize={16} fontWeight="700" color="#2ECC71">
             {fmtCurrency(bill.grandTotal ?? 0, currency)}
           </Text>
+          <Button onPress={shareBill} alignSelf="flex-start">Share bill</Button>
+          {currentUser?.uniqueId && bill.participantUniqueIds.includes(currentUser.uniqueId) && (
+            <Button onPress={toggleMyPayment} disabled={paymentBusy} alignSelf="flex-start">
+              {paidUniqueIds.includes(currentUser.uniqueId) ? 'Mark my share unpaid' : 'Mark my share paid'}
+            </Button>
+          )}
+          <YStack gap="$2" p="$3" borderWidth={1} borderColor="$gray5" borderRadius={12}>
+            <Text fontSize={14} fontWeight="700">Currency converter</Text>
+            <Text fontSize={11} color="$gray10">Enter the exchange rate from {currency} to your selected currency.</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <XStack gap="$2">
+                {CURRENCY_OPTIONS.filter((option) => option.code !== currency).map((option) => (
+                  <Button key={option.code} size="$2" onPress={() => setTargetCurrency(option.code)} theme={targetCurrency === option.code ? 'active' : undefined}>
+                    {option.code}
+                  </Button>
+                ))}
+              </XStack>
+            </ScrollView>
+            {targetCurrency ? (
+              <>
+                <Input value={exchangeRate} onChangeText={(value) => setExchangeRate(value.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder={`1 ${currency} = ? ${targetCurrency}`} accessibilityLabel="Exchange rate" />
+                {convertedTotal != null && (
+                  <Text fontSize={14} color="$gray11">Approx. {fmtCurrency(convertedTotal, targetCurrency)}</Text>
+                )}
+              </>
+            ) : null}
+            {!targetCurrency && (
+              <Text fontSize={12} color="$gray10">Choose a currency to see an approximate conversion.</Text>
+            )}
+          </YStack>
         </YStack>
 
         {participants.map(({ participant, avatarUrl, amount, items }) => (
@@ -185,6 +259,9 @@ export default function HistoryDetailsScreen() {
                 {fmtCurrency(amount, currency)}
               </Text>
             </XStack>
+            <Text fontSize={12} color={paidUniqueIds.includes(participant.uniqueId) ? '$green10' : '$gray9'}>
+              {paidUniqueIds.includes(participant.uniqueId) ? 'Paid' : 'Not marked paid'}
+            </Text>
 
             <YStack gap={8}>
               {items.length ? (

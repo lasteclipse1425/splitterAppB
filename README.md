@@ -13,10 +13,11 @@ The goal is to let students clone the repository, follow the setup instructions,
 
 ## Features
 
-- Photograph a paper receipt. The backend recognizes item names, prices, and currency. If recognition fails, the app shows an error instead of substituting test data.
+- Photograph a paper receipt for on-device text recognition, then review and correct suggested item names, prices, and quantities. OCR uses native Android/iOS modules, does not upload the image, and does not require an API key. Manual item entry is available in Expo Go and as a fallback.
 - Choose the people at the table, split items equally or by quantity, and review each person's total.
-- Add friends by scanning a QR code or pasting an invitation link. Receipt scanning uses a photo and OCR; friend and group invitations use QR links.
-- Review past bill-splitting sessions.
+- Add tax and tip percentages to a bill and split those amounts equally across participants.
+- Add friends by scanning a QR code or pasting an invitation link. Friend and group invitations use QR links.
+- Search bill history by bill or participant, filter by time period, share a bill summary, and mark your share as paid. Bill details also include an optional currency converter using a rate you enter.
 - Edit your username, email, avatar, password, language, theme, and default currency in your profile. You can choose a separate currency for each bill.
 - Supported currencies: UZS, USD, EUR, RUB, GBP, JPY, KZT, CNY, TRY, AED, KRW, and INR. Currency selection changes the currency label and number formatting; it does not convert amounts using exchange rates.
 
@@ -28,7 +29,9 @@ In local Docker mode, profile photos are stored in the persistent `/app/data/ava
 - npm 9+
 - Docker Desktop
 - Git
-- Expo Go on your phone for the mobile workflow
+- Expo Go for manual entry; a development build is required for on-device OCR
+
+The server-side `GEMINI_API_KEY` is optional and only enables the legacy `/sessions/scan` endpoint for other clients; the mobile app does not use it.
 
 Check your setup:
 
@@ -169,7 +172,7 @@ On macOS/Linux, replace the first command with `cp backend/.env.example backend/
 
 ## Web mode
 
-The main student workflow is the mobile app in Expo Go. Web mode is available for preview:
+Core mobile flows work in Expo Go. Receipt OCR needs a native development build. Web mode is available for preview:
 
 ```bash
 npm run frontend:web

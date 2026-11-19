@@ -5,7 +5,7 @@
 - React Native 0.81 with Expo SDK 54 and Expo Router 6.
 - TypeScript 5.9, Tamagui, React Query 5, Zustand 5, Axios, and i18next.
 - Supported interface languages: English, Japanese, and Uzbek.
-- Supported runtime: iOS and Android through Expo Go. Web is a preview target.
+- Supported runtime: iOS and Android. Core/manual flows run in Expo Go; on-device OCR requires a development build. Web is a preview target.
 
 See `package.json` for the exact dependency versions.
 
@@ -30,7 +30,7 @@ Important files:
 
 ## Receipt and split flow
 
-The user photographs a paper receipt. The frontend sends its compressed image to `POST /sessions/scan`; the backend parses it before creating a session. OCR failures return an error and do not substitute mock receipt data. The user then selects participants, reviews and assigns items, and finalizes the allocation. OCR-detected currency is used when available; the user can change the currency label for the current bill.
+The user can photograph a paper receipt for on-device text recognition, then review and correct suggested item names, prices, and quantities. Recognition uses native Android/iOS APIs and does not upload the image or require an API key. Manual item entry is available as a fallback. Both paths create a normal session before the user selects participants, reviews and assigns items, and finalizes the allocation.
 
 Currency selection changes the currency code and number formatting. It does not convert the underlying amounts or use exchange rates.
 

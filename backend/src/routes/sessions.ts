@@ -820,4 +820,36 @@ router.get(
   }
 );
 
+router.patch("/history/:sessionId/payment", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+    const sessionId = Number(req.params.sessionId);
+    if (!Number.isInteger(sessionId) || sessionId <= 0) return res.status(400).json({ error: "Invalid sessionId" });
+    if (typeof req.body?.paid !== "boolean") return res.status(400).json({ error: "paid must be a boolean" });
+
+    const [user, entry] = await Promise.all([
+      prisma.user.findUnique({ where: { id: req.user.id }, select: { uniqueId: true } }),
+      prisma.sessionHistoryEntry.findUnique({ where: { sessionId } }),
+    ]);
+    if (!user?.uniqueId) return res.status(404).json({ error: "User not found" });
+    if (!entry) return res.status(404).json({ error: "Bill not found" });
+    if (!parseParticipantUniqueIds(entry.participantUniqueIds).includes(user.uniqueId)) {
+      return res.status(403).json({ error: "Only bill participants can update payment status" });
+    }
+
+    const payload = (entry.payload && typeof entry.payload === "object" && !Array.isArray(entry.payload)
+      ? entry.payload : {}) as Record<string, unknown>;
+    const paidIds = new Set(Array.isArray(payload.paidUniqueIds)
+      ? payload.paidUniqueIds.filter((id): id is string => typeof id === "string") : []);
+    if (req.body.paid) paidIds.add(user.uniqueId);
+    else paidIds.delete(user.uniqueId);
+    payload.paidUniqueIds = [...paidIds];
+    await prisma.sessionHistoryEntry.update({ where: { sessionId }, data: { payload: payload as Prisma.InputJsonObject } });
+    return res.json({ paidUniqueIds: [...paidIds] });
+  } catch (error) {
+    console.error("PATCH /sessions/history/:sessionId/payment error:", error);
+    return res.status(500).json({ error: "Could not update payment status" });
+  }
+});
+
 export default router;

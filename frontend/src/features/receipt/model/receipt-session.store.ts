@@ -77,6 +77,7 @@ interface ReceiptSessionStore {
   setCurrency: (currency: string) => void; // ✅ Добавлен метод
   updateItem: (itemId: string, updater: (prev: ReceiptSplitItem) => ReceiptSplitItem) => void;
   setItems: (items: ReceiptSplitItem[]) => void;
+  startManualSession: (sessionId: number, sessionName: string, items: ReceiptSplitItem[]) => void;
   setLastFinishPayload: (payload?: FinishPayload) => void;
 
   parseReceipt: (payload: ParseReceiptRequest) => Promise<ParseReceiptResponse>;
@@ -124,6 +125,19 @@ export const useReceiptSessionStore = create<ReceiptSessionStore>((set, get) => 
   },
 
   setItems: (items) => set({ items }),
+  startManualSession: (sessionId, sessionName, items) => set({
+    session: {
+      sessionId,
+      sessionName,
+      language: useAppStore.getState().language || 'en',
+    },
+    items,
+    participants: [],
+    currency: useAppStore.getState().preferredCurrency || 'UZS',
+    finalized: undefined,
+    lastFinishPayload: undefined,
+    finalizeError: undefined,
+  }),
   setLastFinishPayload: (payload) => set({ lastFinishPayload: payload }),
 
   parseReceipt: async (payload) => {

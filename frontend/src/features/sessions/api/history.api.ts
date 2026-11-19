@@ -45,6 +45,7 @@ export type SessionHistoryPayload = {
   allocations: SessionHistoryAllocation[];
   finalizedAt?: string;
   sessionName?: string;
+  paidUniqueIds?: string[];
 };
 
 /** Сырая запись, как приходит с сервера */
@@ -135,6 +136,12 @@ const logErr = (msg: string, error: any) => {
 /** ========================= */
 
 export const SessionsHistoryApi = {
+  async setPaymentStatus(sessionId: number, paid: boolean): Promise<string[]> {
+    const { data } = await apiClient.patch<{ paidUniqueIds: string[] }>(
+      `${HISTORY_ENDPOINT}/${sessionId}/payment`, { paid }
+    );
+    return data.paidUniqueIds ?? [];
+  },
   /**
    * Получить историю сессий (сырой ответ от сервера)
    */

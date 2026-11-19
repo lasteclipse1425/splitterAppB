@@ -17,6 +17,8 @@ From the repository root:
 npm run backend:docker
 ```
 
+The mobile frontend uses on-device OCR and does not require an OCR API key. `GEMINI_API_KEY` is optional and only enables the legacy server-side `/sessions/scan` endpoint for other clients.
+
 Backend URL:
 
 ```text

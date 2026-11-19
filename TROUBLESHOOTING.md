@@ -1,5 +1,9 @@
 # Troubleshooting
 
+## Legacy receipt API says the OCR API key is not configured
+
+The mobile app now recognizes receipt text on the device and does not call this endpoint. The server-side `/sessions/scan` endpoint is optional; set `GEMINI_API_KEY` in `backend/.env` only if another client uses that legacy endpoint.
+
 ## ERR_NETWORK в приложении
 
 Проверьте:

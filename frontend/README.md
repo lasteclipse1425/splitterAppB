@@ -29,7 +29,7 @@ Web preview:
 npm run frontend:web
 ```
 
-Mobile through Expo Go is the main supported student workflow. Web mode is useful for preview, but can be less stable because this is a React Native app.
+Manual receipt entry works in Expo Go. On-device receipt text recognition uses native Android/iOS modules, so OCR requires a development build (`npm run android` or `npm run ios` from `frontend/`) instead of Expo Go. Web mode does not support OCR.
 
 ## Main features
 
